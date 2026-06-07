@@ -44,7 +44,7 @@ function injecterComposantsPartages() {
                         <li><a href="${cheminRacine}cours/gc-btp/index.html" class="dropdown-menu__lien">Génie Civil & BTP (GC-BTP)</a></li>
                         <li><a href="${cheminRacine}cours/geaah/index.html" class="dropdown-menu__lien">Génie Eau, Assainissement & AH (GEAAH)</a></li>
                     </ul>
-                </li>
+                </                </li>
                 <li><a href="${cheminRacine}bibliotheque.html" class="nav-menu__lien">Bibliothèque</a></li>
                 <li><a href="${cheminRacine}rapports.html" class="nav-menu__lien">Stages & PFE</a></li>
                 <li><a href="${cheminRacine}a-propos.html" class="nav-menu__lien">À Propos</a></li>
@@ -96,7 +96,7 @@ function configurerVerificateurLiensDrive() {
         "environnement": "https://drive.google.com/drive/folders/16kGTSON3VM00fgO7yHSw-Crd_Invwl2E?usp=drive_link",
         "topo": "https://drive.google.com/drive/folders/1qHREb9syoYHnP8SDe3fNB0doqYVlfyIg?usp=drive_link",
         "gestion": "https://drive.google.com/drive/folders/1ogXJra52xgtYmpJzdGvK-Jqb7i648-hz?usp=drive_link",
-        "outils": "https://drive.google.com/drive/folders/1Fit1ZhawLmkbBpwykFl4XdTA5Byiat01?usp=drive_link"
+        "outils": "https://drive.google.com/drive/folders/1Fit1ZhawLmkbBpwykFl4XdTA5Byiat01?usp=drive_link", // <-- LA VIRGULE A ÉTÉ CORRIGÉE ICI 🚀
         "rapports-stage": "https://drive.google.com/drive/folders/1BlvVMKXNe9vtMIrDwi-rCikYBIWQ8Vfb?usp=drive_link",
         "rapports-pfe": "https://drive.google.com/drive/folders/1I2ZrQ3mFpQ4hwxV_5lbyESOrPsL4jAPS?usp=drive_link",
         "rapports-projets": "https://drive.google.com/drive/folders/1OxNcNcWlR4O18F2Eu-nrUeWZuwe0w46q?usp=drive_link",
@@ -137,13 +137,17 @@ function configurerVerificateurLiensDrive() {
         if (cible) {
             evenement.preventDefault();
             const cleDossier = cible.getAttribute("data-dossier");
-            const urlDestination = liensDrive[cleDossier];
-
-            if (urlDestination && urlDestination !== "") {
-                window.open(urlDestination, "_blank");
-            } else {
-                alert(`📂 Le dossier Drive pour "${cible.textContent.trim()}" est en cours de centralisation.\nIl sera disponible très prochainement !`);
+            
+            if (cleDossier) {
+                const urlDestination = liensDrive[cleDossier.trim()];
+                if (urlDestination && urlDestination !== "") {
+                    window.open(urlDestination, "_blank");
+                    return;
+                }
             }
+
+            // Message de secours propre si l'association échoue
+            alert(`📂 Le dossier Drive demandé est en cours de centralisation.\nIl sera disponible très prochainement !`);
         }
     });
 }
@@ -158,7 +162,7 @@ function configurerFormulaireContribution() {
     if (!formulaire || !selectSemestre) return;
 
     formulaire.addEventListener("submit", (evenement) => {
-        evenement.preventDefault(); // Bloque le rechargement standard de la page
+        evenement.preventDefault();
 
         const bouton = formulaire.querySelector('button[type="submit"]');
         const texteOrigine = bouton.innerHTML;
@@ -181,7 +185,6 @@ function configurerFormulaireContribution() {
         reader.onload = function() {
             const base64Data = reader.result.split(',')[1];
 
-            // Récupération des valeurs textuelles du formulaire
             const vNom = document.getElementById('contrib-nom').value;
             const vEmail = document.getElementById('contrib-email').value;
             
@@ -202,24 +205,21 @@ function configurerFormulaireContribution() {
             
             const vCommentaire = document.getElementById('contrib-commentaire').value;
 
-            // --- CONTOURNEMENT CORS ULTIME : CRÉATION D'UNE IFRAME MASQUÉE ---
             let iframeId = 'iframe-masquee-archiv2ie';
             let iframe = document.getElementById(iframeId);
             if (!iframe) {
                 iframe = document.createElement('iframe');
                 iframe.id = iframeId;
                 iframe.name = iframeId;
-                iframe.style.display = 'none'; // Totalement invisible
+                iframe.style.display = 'none';
                 document.body.appendChild(iframe);
             }
 
-            // Création d'un formulaire temporaire qui va cibler l'iframe
             const formTemporaire = document.createElement('form');
             formTemporaire.method = 'POST';
             formTemporaire.action = "https://script.google.com/macros/s/AKfycbyCsHpIQj_ncjj6Tjbvaz4xqoA6KbWBpXmR-D5TvAVdTAFgKZzXpjzhf0TaDY41J7Ol/exec";
-            formTemporaire.target = iframeId; // Force l'envoi à s'exécuter dans l'iframe
+            formTemporaire.target = iframeId;
 
-            // Liste de toutes les données à envoyer
             const données = {
                 nom: vNom,
                 email: vEmail,
@@ -231,10 +231,9 @@ function configurerFormulaireContribution() {
                 commentaire: vCommentaire || "Aucun",
                 filename: fichier.name,
                 mimeType: fichier.type,
-                bytes: base64Data // Le fichier volumineux passe sans problème ici
+                bytes: base64Data
             };
 
-            // Injection des données sous forme de champs cachés (<input type="hidden">)
             for (const [cle, valeur] of Object.entries(données)) {
                 const input = document.createElement('input');
                 input.type = 'hidden';
@@ -243,11 +242,9 @@ function configurerFormulaireContribution() {
                 formTemporaire.appendChild(input);
             }
 
-            // Soumission du formulaire en arrière-plan
             document.body.appendChild(formTemporaire);
             formTemporaire.submit();
             
-            // Simulation du succès de l'envoi après 3.5 secondes (temps moyen de transit pour un fichier)
             setTimeout(() => {
                 document.body.removeChild(formTemporaire);
                 
