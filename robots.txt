@@ -1,6 +1,0 @@
-# Étape 1 : Autoriser tous les robots du monde à visiter le site
-User-agent: *
-Allow: /
-
-# Étape 2 : Donner l'adresse exacte de ton plan de site à Google
-Sitemap: https://akashi47.github.io/archiv2ie/sitemap.xml
