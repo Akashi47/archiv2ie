@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5VDYM0QJE6"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-5VDYM0QJE6');
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Partagez vos cours, sujets d'examens corrigés et rapports pour enrichir la communauté Archiv2iE. Envoyez vos documents en toute sécurité via notre formulaire.">
+    <title>archiv2ie - Contribuer à la base de données</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+    <header id="header-commun"></header>
+
+    <main class="main-wrapper anime-section">
+        
+        <h1 class="section-titre">Contribuer au projet</h1>
+        
+        <div class="bloc-synopsis">
+            <p class="bloc-synopsis__texte">
+                "Archiv2iE existe grâce à ceux qui donnent autant qu'ils reçoivent."
+            </p>
+        </div>
+
+        <section style="margin: 40px 0;">
+            <h3 style="margin-bottom: 25px;">Le protocole de dépôt en 3 étapes</h3>
+            <div class="grid-responsive-3">
+                <div class="carte-standard" style="text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">📋 1</div>
+                    <strong>Formulaire</strong>
+                    <p style="font-size: 0.85rem; color: var(--texte-secondaire); margin-top: 5px;">Remplissez les métadonnées (matière, enseignant, année de passation).</p>
+                </div>
+                <div class="carte-standard" style="text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">📤 2</div>
+                    <strong>Dépôt</strong>
+                    <p style="font-size: 0.85rem; color: var(--texte-secondaire); margin-top: 5px;">Téléversez votre fichier PDF (propre, lisible et bien numérisé).</p>
+                </div>
+                <div class="carte-standard" style="text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">🛡️ 3</div>
+                    <strong>Modération</strong>
+                    <p style="font-size: 0.85rem; color: var(--texte-secondaire); margin-top: 5px;">L'équipe trie, renomme et classe le document dans le bon répertoire Drive.</p>
+                </div>
+            </div>
+        </section>
+
+        <section style="margin: 40px 0;">
+            <h3 style="margin-bottom: 15px;">Charte de validation des documents</h3>
+            <div class="table-container">
+                <table class="table-custom">
+                    <thead>
+                        <tr>
+                            <th style="background-color: #E8F8F5; color: #115d45;">✅ Éléments Acceptés</th>
+                            <th style="background-color: #FADBD8; color: #78281f;">❌ Éléments Rejetés</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Sujets officiels d'examens et devoirs (propres)</td>
+                            <td>Fichiers flous, mal cadrés ou illisibles</td>
+                        </tr>
+                        <tr>
+                            <td>Syllabus officiels mis à jour par l'administration</td>
+                            <td>Documents comportant des données personnelles privées</td>
+                        </tr>
+                        <tr>
+                            <td>Fiches de révisions d'équipes et TP complets</td>
+                            <td>Ressources payantes d'éditeurs externes tiers</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="carte-standard" style="margin-top: 40px; border-top: 5px solid var(--vert-2ie);">
+            <h3 style="margin-bottom: 5px;">Partagez vos ressources avec la communauté 2iE</h3>
+            <p style="color: var(--texte-secondaire); font-size: 0.9rem; margin-bottom: 25px;">
+                Cours, annales, rapports - chaque contribution compte.
+            </p>
+
+            <form id="formulaire-contribution" style="display: flex; flex-direction: column; gap: 20px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label for="contrib-nom" style="font-weight: 500; font-size: 0.9rem;">Nom & Prénoms</label>
+                        <input type="text" id="contrib-nom" name="nom" required placeholder="Ex: EL YAH" style="padding: 10px; border: 1px solid var(--bordure-legere); border-radius: 6px; font-family: inherit;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label for="contrib-email" style="font-weight: 500; font-size: 0.9rem;">Adresse email</label>
+                        <input type="email" id="contrib-email" name="email" required placeholder="Ex: votre.nom@2ie-edu.org" style="padding: 10px; border: 1px solid var(--bordure-legere); border-radius: 6px; font-family: inherit;">
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <label style="font-weight: 500; font-size: 0.9rem;">Vous êtes?</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 5px;">
+                        <label style="cursor: pointer;"><input type="radio" name="statut" value="Etudiant" checked> Étudiant</label>
+                        <label style="cursor: pointer;"><input type="radio" name="statut" value="Enseignant"> Enseignant</label>
+                        <label style="cursor: pointer;"><input type="radio" name="statut" value="Ancien étudiant"> Ancien étudiant</label>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label for="contrib-filiere" style="font-weight: 500; font-size: 0.9rem;">Filière</label>
+                        <select id="contrib-filiere" name="filiere" onchange="actualiserListeSemestres(this.value)" required style="padding: 10px; border: 1px solid var(--bordure-legere); border-radius: 6px; font-family: inherit;">
+                            <option value="">-- Sélectionnez la filière --</option>
+                            <option value="tc">Tronc Commun (S1 à S4)</option>
+                            <option value="gee">Génie Électrique & Énergétique (GEE)</option>
+                            <option value="gc-btp">Génie Civil & BTP (GC-BTP)</option>
+                            <option value="geaah">Génie Eau, Assainissement & AH (GEAAH)</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label for="contrib-semestre" style="font-weight: 500; font-size: 0.9rem;">Semestre / Option</label>
+                        <select id="contrib-semestre" name="semestre" required disabled style="padding: 10px; border: 1px solid var(--bordure-legere); border-radius: 6px; font-family: inherit; background: #f5f5f5;">
+                            <option value="">-- Choisissez d'abord la filière --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label for="contrib-nom-doc" style="font-weight: 500; font-size: 0.9rem;">Nom du document</label>
+                        <input type="text" id="contrib-nom-doc" name="nomDoc" required placeholder="Ex : Cours Hydraulique à surface libre - Prof. Yonaba" style="padding: 10px; border: 1px solid var(--bordure-legere); border-radius: 6px; font-family: inherit;">
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label for="contrib-matiere" style="font-weight: 500; font-size: 0.9rem;">Matière concernée</label>
+                        <input type="text" id="contrib-matiere" name="matiere" required placeholder="Ex : Hydraulique à surface libre" style="padding: 10px; border: 1px solid var(--bordure-legere); border-radius: 6px; font-family: inherit;">
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <label style="font-weight: 500; font-size: 0.9rem;">Type de document</label>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 5px;">
+                        <label><input type="radio" name="typeDoc" value="Cours" checked> 📚 Cours</label>
+                        <label><input type="radio" name="typeDoc" value="TD/TP"> 📝 TD / TP</label>
+                        <label><input type="radio" name="typeDoc" value="Annales"> 📄 Annales / Sujet d'examen</label>
+                        <label><input type="radio" name="typeDoc" value="Rapport stage"> 📋 Rapport de stage</label>
+                        <label><input type="radio" name="typeDoc" value="Rapport PFE"> 🎓 Rapport de PFE</label>
+                        <label><input type="radio" name="typeDoc" value="Rapport projet"> 🔬 Rapport de projet / TP</label>
+                        <label><input type="radio" name="typeDoc" value="Livre"> 📖 Livre / Article</label>
+                        <label><input type="radio" name="typeDoc" value="Autre"> 🔧 Autre</label>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <label for="contrib-fichier" style="font-weight: 500; font-size: 0.9rem;">Déposez votre fichier ici</label>
+                    <input type="file" id="contrib-fichier" required style="padding: 15px; border: 2px dashed var(--vert-2ie); border-radius: 8px; background-color: var(--fond-alt); cursor: pointer;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                    <label for="contrib-commentaire" style="font-weight: 500; font-size: 0.9rem;">Commentaire ou précision (optionnel)</label>
+                    <textarea id="contrib-commentaire" name="commentaire" rows="3" placeholder="Une remarque sur le document ? Une précision pour l'équipe ?" style="padding: 10px; border: 1px solid var(--bordure-legere); border-radius: 6px; font-family: inherit; resize: vertical;"></textarea>
+                </div>
+
+                <div style="text-align: right; margin-top: 10px;">
+                    <button type="submit" class="btn-primaire" style="border: none; cursor: pointer; font-size: 1rem; padding: 12px 35px;">Soumettre le document 📤</button>
+                </div>
+            </form>
+        </section>
+
+    </main>
+
+    <footer id="footer-commun"></footer>
+    <script src="assets/js/main.js"></script>
+</body>
+</html>
