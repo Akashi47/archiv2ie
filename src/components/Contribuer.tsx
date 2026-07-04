@@ -22,7 +22,8 @@ import {
   Search,
   Mail,
   Eye,
-  EyeOff
+  EyeOff,
+  ExternalLink
 } from 'lucide-react';
 import { 
   collection, 
@@ -698,6 +699,10 @@ Commentaire: ${dep.commentaire}`;
   };
 
   const processFile = (file: File) => {
+    if (file.size > 15 * 1024 * 1024) {
+      showToast("Désolé, ce fichier dépasse la limite de 15 Mo. Veuillez choisir un document plus léger ou compressé.", "error");
+      return;
+    }
     setSelectedFile(file);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -731,6 +736,11 @@ Commentaire: ${dep.commentaire}`;
     e.preventDefault();
     if (!selectedFile) {
       showToast("Veuillez sélectionner un fichier d'abord 📂", "error");
+      return;
+    }
+
+    if (!base64Data) {
+      showToast("Le fichier est en cours de traitement en arrière-plan. Veuillez patienter une seconde puis réessayez.", "info");
       return;
     }
 
@@ -773,8 +783,12 @@ Commentaire: ${dep.commentaire}`;
       let driveFileId = '';
       let driveStatus = 'pending';
 
-      // If active token exists, upload file DIRECTLY into Admin's Google Drive from student browser
-      if (activeToken) {
+      // Safe Firestore limit: 1MB document limit, Base64 adds 33% overhead. Max binary size ~750KB.
+      const isTooLargeForFirestore = selectedFile.size > 750000;
+      const base64ToStore = isTooLargeForFirestore ? '' : base64Data;
+
+      // If active token exists and the file is NOT too large for direct API upload
+      if (activeToken && !isTooLargeForFirestore) {
         try {
           const fileDesc = `Dépôt archiv2ie\nAuteur: ${formData.nom} (${formData.statut})\nEmail: ${formData.email}\nFilière: ${mappedFiliere}\nSemestre: ${formData.semestre}\nMatière: ${formData.matiere}\nDocument: ${formData.nomDoc}\nCommentaire: ${formData.commentaire || 'Aucun'}`;
           
@@ -792,7 +806,7 @@ Commentaire: ${dep.commentaire}`;
         }
       }
 
-      // 4. Save metadata + base64 to central cloud database (Firestore)
+      // 4. Save metadata (+ base64 if small) to central cloud database (Firestore)
       const newDepot = {
         id: depositId,
         date: nowStr,
@@ -811,13 +825,14 @@ Commentaire: ${dep.commentaire}`;
         status: 'pending',
         driveFileId: driveFileId,
         driveStatus: driveStatus,
-        base64: base64Data,
+        base64: base64ToStore,
+        isLargeFile: isTooLargeForFirestore,
         createdAt: new Date().toISOString()
       };
 
       await setDoc(doc(db, 'deposits', depositId), newDepot);
 
-      // 5. Submit backup to original Google Apps Script inside hidden iframe
+      // 5. Submit backup/large file to original Google Apps Script inside hidden iframe
       try {
         const iframeId = 'iframe-masquee-archiv2ie-react';
         let iframe = document.getElementById(iframeId) as HTMLIFrameElement;
@@ -871,10 +886,12 @@ Commentaire: ${dep.commentaire}`;
       setIsSubmitting(false);
 
       let alertMessage = `Merci pour votre contribution, ${formData.nom} ! Votre document a été enregistré avec succès sur archiv2ie. 🚀\n\n`;
-      if (driveStatus === 'success') {
-        alertMessage += `GÉNIAL : Le document a été téléversé automatiquement dans le Google Drive de l'administrateur d'archiv2ie !`;
+      if (isTooLargeForFirestore) {
+        alertMessage += `Note : En raison de sa taille (${(selectedFile.size / (1024 * 1024)).toFixed(2)} Mo), le fichier a été envoyé directement vers votre Google Drive d'administration via Google Apps Script pour préserver la base de données.`;
+      } else if (driveStatus === 'success') {
+        alertMessage += `GÉNIAL : Le document a été téléversé automatiquement dans votre dossier Google Drive d'archiv2ie !`;
       } else {
-        alertMessage += `Le document a été stocké en sécurité sur le serveur d'archiv2ie. L'administrateur le synchronisera vers Google Drive lors de sa prochaine session d'archivage.`;
+        alertMessage += `Le document a été enregistré. L'administrateur le synchronisera vers Google Drive lors de sa prochaine session d'archivage.`;
       }
 
       showToast(alertMessage, 'success');
@@ -897,7 +914,7 @@ Commentaire: ${dep.commentaire}`;
     } catch (err: any) {
       console.error(err);
       setIsSubmitting(false);
-      alert(`Une erreur est survenue lors de la soumission : ${err.message || err}`);
+      showToast(`Une erreur est survenue lors de la soumission : ${err.message || err}`, 'error');
     }
   };
 
@@ -1515,8 +1532,14 @@ Commentaire: ${dep.commentaire}`;
                             </div>
                           </div>
 
-                          {/* Right side: Drive sync indicator & Expand triggers */}
+                          {/* Right side: Drive sync indicator, large file indicator & Expand triggers */}
                           <div className="flex items-center gap-2 self-end sm:self-center">
+                            {dep.isLargeFile && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-100" title="Ce fichier dépasse 750 Ko et est sauvegardé sur Google Drive">
+                                ⚡ Volumineux
+                              </span>
+                            )}
+
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
                               isSynced 
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
@@ -1571,6 +1594,18 @@ Commentaire: ${dep.commentaire}`;
                                 <div className="space-y-1 col-span-1 sm:col-span-2 font-mono">
                                   <span className="font-bold text-emerald-600 block uppercase text-[9px] tracking-wider">ID Document Google Drive</span>
                                   <span className="text-emerald-700 bg-emerald-50 px-2 py-1 rounded select-all break-all text-[10px] inline-block">{dep.driveFileId}</span>
+                                </div>
+                              )}
+
+                              {dep.isLargeFile && !dep.driveFileId && (
+                                <div className="space-y-1 col-span-1 sm:col-span-2 text-purple-700 bg-purple-50/70 p-3 rounded-xl border border-purple-100 text-[10px] leading-relaxed">
+                                  ⚠️ <strong>Fichier Volumineux ({dep.fileSize}) :</strong> Ce document a été envoyé directement sur votre Google Drive d'administration ou via Google Apps Script. Il n'est pas stocké dans la base de données centrale Firestore pour des raisons de limites de taille.
+                                </div>
+                              )}
+
+                              {dep.isLargeFile && dep.driveFileId && (
+                                <div className="space-y-1 col-span-1 sm:col-span-2 text-purple-700 bg-purple-50/70 p-3 rounded-xl border border-purple-100 text-[10px] leading-relaxed">
+                                  ℹ️ <strong>Fichier Volumineux ({dep.fileSize}) :</strong> Ce fichier dépasse les capacités de la base de données. Il est stocké de manière sécurisée et permanente dans votre espace Google Drive.
                                 </div>
                               )}
 
@@ -1650,11 +1685,25 @@ Commentaire: ${dep.commentaire}`;
                                       ? 'bg-brand/10 hover:bg-brand/20 active:bg-brand/30 text-brand-hover'
                                       : 'bg-gray-50 text-gray-300 cursor-not-allowed border border-gray-100'
                                   }`}
-                                  title="Télécharger une copie locale du fichier numérique d'origine"
+                                  title={dep.isLargeFile ? "Ce fichier volumineux est stocké directement sur Google Drive" : "Télécharger une copie locale du fichier numérique d'origine"}
                                 >
                                   <Download className="h-3.5 w-3.5" />
                                   <span>Télécharger fichier</span>
                                 </button>
+
+                                {/* Open directly in Drive button */}
+                                {dep.driveFileId && (
+                                  <a
+                                    href={`https://drive.google.com/open?id=${dep.driveFileId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs rounded-xl transition-all border border-emerald-100"
+                                    title="Ouvrir ce document directement dans Google Drive"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                    <span>Ouvrir sur Drive 📂</span>
+                                  </a>
+                                )}
                               </div>
 
                               {/* Delete button or inline confirmation */}

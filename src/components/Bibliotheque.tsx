@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { libraryCategories, driveLinks } from '../data';
 import { CourseCategory } from '../types';
-import { Calculator, Droplet, HardHat, Zap, Leaf, Map, TrendingUp, Wrench, ExternalLink, Search, Library, AlertCircle } from 'lucide-react';
+import { Calculator, Droplet, HardHat, Zap, Leaf, Map, TrendingUp, Wrench, ExternalLink, Search, Library, AlertCircle, Copy, Check } from 'lucide-react';
 
 export default function Bibliotheque() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const openDriveFolder = (key: string) => {
     const link = driveLinks[key];
@@ -115,15 +116,43 @@ export default function Bibliotheque() {
           </p>
         </div>
 
-        <a 
-          href="http://documentation.2ie-edu.org/cdi2ie/opac_css/index.php" 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          className="inline-flex items-center gap-2 px-6 py-3 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl text-xs sm:text-sm shadow-md transition-all transform hover:-translate-y-0.5"
-        >
-          <span>Consulter le catalogue en ligne (OPAC)</span>
-          <ExternalLink className="h-4 w-4" />
-        </a>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a 
+            href="http://documentation.2ie-edu.org/cdi2ie/opac_css/index.php" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="inline-flex items-center gap-2 px-6 py-3 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl text-xs sm:text-sm shadow-md transition-all transform hover:-translate-y-0.5"
+          >
+            <span>Consulter le catalogue en ligne (OPAC)</span>
+            <ExternalLink className="h-4 w-4" />
+          </a>
+          
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText("http://documentation.2ie-edu.org/cdi2ie/opac_css/index.php");
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2500);
+            }}
+            className="inline-flex items-center gap-2 px-5 py-3 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-xs sm:text-sm border border-gray-200 transition-all shadow-sm cursor-pointer"
+            title="Copier le lien direct vers le catalogue en ligne de 2iE"
+          >
+            {copied ? (
+              <>
+                <span>Lien copié ! 📋</span>
+                <Check className="h-4 w-4 text-emerald-600" />
+              </>
+            ) : (
+              <>
+                <span>Copier le lien direct</span>
+                <Copy className="h-4 w-4 text-gray-500" />
+              </>
+            )}
+          </button>
+        </div>
+        
+        <p className="text-[10px] text-gray-400 max-w-md mx-auto">
+          Note : Le catalogue officiel de 2iE utilise une adresse non-sécurisée (HTTP). Si le lien ne s'ouvre pas, copiez-le ci-dessus et collez-le directement dans un nouvel onglet de votre navigateur.
+        </p>
       </div>
 
     </div>
