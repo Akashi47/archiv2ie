@@ -333,7 +333,8 @@ export default function Contribuer() {
       }
     } catch (e: any) {
       console.error("La connexion admin a échoué:", e);
-      showToast("Erreur de connexion avec Google. Si cela persiste, utilisez la connexion par mot de passe de secours.", "error");
+      const errorCode = e.code ? ` (${e.code})` : '';
+      showToast(`Erreur de connexion avec Google${errorCode}. Utilisez le mot de passe de secours pour vous connecter instantanément.`, "error");
     } finally {
       setIsLoggingIn(false);
     }

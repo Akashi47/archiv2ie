@@ -11,26 +11,54 @@ import {
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-const activeConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfig.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfig.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfig.projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfig.messagingSenderId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfig.appId,
+const getEnvVal = (val: any): string | undefined => {
+  if (val === undefined || val === null) return undefined;
+  const s = String(val).trim();
+  if (s === "" || s === "undefined" || s === "null") return undefined;
+  return s;
 };
 
-const app = initializeApp(activeConfig);
-const auth = getAuth(app);
+const overriddenProjectId = getEnvVal(import.meta.env.VITE_FIREBASE_PROJECT_ID);
+const overriddenApiKey = getEnvVal(import.meta.env.VITE_FIREBASE_API_KEY);
 
 const isProjectOverridden = 
-  !!import.meta.env.VITE_FIREBASE_PROJECT_ID || 
-  !!import.meta.env.VITE_FIREBASE_API_KEY ||
+  !!overriddenProjectId || 
+  !!overriddenApiKey ||
   (typeof window !== 'undefined' && 
    !window.location.hostname.includes('ai-studio') && 
    !window.location.hostname.includes('run.app') && 
    !window.location.hostname.includes('localhost') && 
    !window.location.hostname.includes('127.0.0.1'));
+
+const projectId = overriddenProjectId || firebaseConfig.projectId;
+
+const activeConfig = {
+  projectId: projectId,
+  apiKey: overriddenApiKey || firebaseConfig.apiKey,
+  authDomain: getEnvVal(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN) || 
+              (overriddenProjectId ? `${projectId}.firebaseapp.com` : firebaseConfig.authDomain),
+  storageBucket: getEnvVal(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET) || 
+                 (overriddenProjectId ? `${projectId}.firebasestorage.app` : firebaseConfig.storageBucket),
+  messagingSenderId: getEnvVal(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID) || firebaseConfig.messagingSenderId,
+  appId: getEnvVal(import.meta.env.VITE_FIREBASE_APP_ID) || firebaseConfig.appId,
+};
+
+// Mask sensitive values for safe logging
+const maskedApiKey = activeConfig.apiKey ? `${activeConfig.apiKey.slice(0, 6)}...` : 'undefined';
+const maskedAppId = activeConfig.appId ? `${activeConfig.appId.slice(0, 10)}...` : 'undefined';
+
+console.log("[Firebase Init] Active Configuration:", {
+  projectId: activeConfig.projectId,
+  authDomain: activeConfig.authDomain,
+  storageBucket: activeConfig.storageBucket,
+  messagingSenderId: activeConfig.messagingSenderId,
+  apiKey: maskedApiKey,
+  appId: maskedAppId,
+  isProjectOverridden,
+});
+
+const app = initializeApp(activeConfig);
+const auth = getAuth(app);
 
 const dbId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || (isProjectOverridden ? '' : firebaseConfig.firestoreDatabaseId);
 const db = dbId ? getFirestore(app, dbId) : getFirestore(app);
