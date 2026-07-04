@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Is Admin Helper
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == "eyuaelijah@gmail.com";
+    }
+
+    // Deposits Collection rules
+    match /deposits/{depositId} {
+      // Anyone can submit a document contribution
+      allow create: if true;
+      
+      // Only the admin can view, update, delete, or list submissions
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Admin Configurations rules
+    match /admin_config/{configId} {
+      // Anyone can read config to fetch the active upload access token for Drive
+      allow read: if true;
+      
+      // Only the admin can set or refresh the active token
+      allow write: if isAdmin();
+    }
+  }
+}

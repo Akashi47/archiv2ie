@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Archiv2iE",
+  "description": "Plateforme d\u0027archivage et de partage de ressources pédagogiques pour les étudiants de l\u0027Institut 2iE.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

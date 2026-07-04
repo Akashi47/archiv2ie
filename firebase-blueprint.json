@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "Deposit": {
+      "title": "Deposit",
+      "description": "Student submission metadata and document base64 content",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "nom": { "type": "string" },
+        "email": { "type": "string" },
+        "statut": { "type": "string" },
+        "filiere": { "type": "string" },
+        "semestre": { "type": "string" },
+        "nomDoc": { "type": "string" },
+        "matiere": { "type": "string" },
+        "typeDoc": { "type": "string" },
+        "commentaire": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "fileType": { "type": "string" },
+        "status": { "type": "string" },
+        "driveFileId": { "type": "string" },
+        "driveStatus": { "type": "string" },
+        "base64": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "nom", "email", "nomDoc", "fileName", "base64"]
+    },
+    "AdminConfig": {
+      "title": "AdminConfig",
+      "description": "Admin configuration containing the active Google Access Token for Drive file creation",
+      "type": "object",
+      "properties": {
+        "accessToken": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "expiresAt": { "type": "number" },
+        "adminEmail": { "type": "string" }
+      },
+      "required": ["accessToken", "expiresAt"]
+    }
+  },
+  "firestore": {
+    "/deposits/{depositId}": {
+      "schema": { "$ref": "#/entities/Deposit" },
+      "description": "Collection of pedagogical document deposits"
+    },
+    "/admin_config/{configId}": {
+      "schema": { "$ref": "#/entities/AdminConfig" },
+      "description": "Administrative tokens and configuration keys"
+    }
+  }
+}

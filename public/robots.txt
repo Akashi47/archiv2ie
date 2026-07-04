@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://archiv2ie.vercel.app/sitemap.xml
