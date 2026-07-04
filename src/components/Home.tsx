@@ -2,7 +2,7 @@ import React from 'react';
 import { Page, FiliereKey } from '../types';
 import { driveLinks } from '../data';
 import { BookOpen, Calendar, ArrowRight, Download, FileText, Library, HelpCircle, HardHat, Zap, Droplet, Award, ChevronRight } from 'lucide-react';
-import graduatesImg from '../assets/images/remise_diplomes_2ie_1783045588434.jpg';
+import graduatesImg from '../assets/images/remise-diplomes-2ie.jpg';
 
 interface HomeProps {
   setCurrentPage: (page: Page) => void;
