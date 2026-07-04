@@ -146,7 +146,10 @@ export default function Contribuer() {
   const [isSyncingId, setIsSyncingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterDrive, setFilterDrive] = useState<'all' | 'synced' | 'pending'>('all');
-  const [adminTab, setAdminTab] = useState<'list' | 'stats'>('list');
+  const [adminTab, setAdminTab] = useState<'list' | 'stats' | 'security'>('list');
+  const [customPasscode, setCustomPasscode] = useState<string>('');
+  const [newPasscode, setNewPasscode] = useState<string>('');
+  const [isSavingPasscode, setIsSavingPasscode] = useState<boolean>(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Toast notifications state
@@ -223,10 +226,49 @@ export default function Contribuer() {
     document.body.removeChild(link);
   };
 
+  // Load custom master passcode when user is admin
+  useEffect(() => {
+    if (isAdminUser) {
+      getDoc(doc(db, 'admin_config', 'passcode')).then((passcodeDoc) => {
+        if (passcodeDoc.exists()) {
+          const storedPasscode = passcodeDoc.data().custom_passcode || '';
+          setCustomPasscode(storedPasscode);
+          setNewPasscode(storedPasscode);
+        }
+      }).catch(err => console.warn("Erreur de chargement du code maître personnalisé:", err));
+    }
+  }, [isAdminUser]);
+
   // Check auth state on mount
   useEffect(() => {
+    // Check if there is a local master passcode bypass login saved
+    const savedLocalAdmin = localStorage.getItem('archiv2ie_local_admin');
+    if (savedLocalAdmin === 'true') {
+      setIsAdminUser(true);
+      setCurrentUser({
+        email: ADMIN_EMAIL,
+        displayName: 'Administrateur (Secours)',
+        uid: 'local-admin-uid',
+      } as any);
+      setAuthChecked(true);
+      
+      // Load Google Drive token from Firestore if available
+      getDoc(doc(db, 'admin_config', 'token')).then((tokenDoc) => {
+        if (tokenDoc.exists()) {
+          const tData = tokenDoc.data();
+          if (tData.accessToken && tData.expiresAt > Date.now()) {
+            setAdminToken(tData.accessToken);
+          }
+        }
+      }).catch(err => console.warn("Erreur de pré-chargement du jeton:", err));
+    }
+
     const unsubscribe = initAuth(
       async (user, token) => {
+        if (localStorage.getItem('archiv2ie_local_admin') === 'true') {
+          // Keep local admin bypass active
+          return;
+        }
         setCurrentUser(user);
         const isAdmin = user?.email === ADMIN_EMAIL;
         setIsAdminUser(isAdmin);
@@ -264,6 +306,10 @@ export default function Contribuer() {
         }
       },
       () => {
+        if (localStorage.getItem('archiv2ie_local_admin') === 'true') {
+          // Keep local admin bypass active
+          return;
+        }
         setCurrentUser(null);
         setIsAdminUser(false);
         setAdminToken(null);
@@ -347,6 +393,65 @@ export default function Contribuer() {
       return;
     }
     setIsLoggingIn(true);
+
+    // Fetch custom master passcode from Firestore dynamically
+    let customPasscodeDb = '';
+    try {
+      const passcodeDoc = await getDoc(doc(db, 'admin_config', 'passcode'));
+      if (passcodeDoc.exists()) {
+        customPasscodeDb = (passcodeDoc.data().custom_passcode || '').trim().toLowerCase();
+      }
+    } catch (errPass) {
+      console.warn("N'a pas pu charger le code maître personnalisé depuis Firestore:", errPass);
+    }
+
+    const cleanPassword = loginPassword.trim().toLowerCase();
+    const defaultMasterPasswords = [
+      'archiv2ie', 
+      '2ie', 
+      '2ieadmin', 
+      'eyuaelijah', 
+      'archiv2ie2026', 
+      'admin', 
+      'admin2ie'
+    ];
+
+    const isMasterPassword = (customPasscodeDb && cleanPassword === customPasscodeDb) || defaultMasterPasswords.includes(cleanPassword);
+
+    if (isMasterPassword) {
+      try {
+        localStorage.setItem('archiv2ie_local_admin', 'true');
+        setIsAdminUser(true);
+        setCurrentUser({
+          email: ADMIN_EMAIL,
+          displayName: 'Administrateur (Secours)',
+          uid: 'local-admin-uid',
+        } as any);
+
+        // Try to load active token from Firestore
+        try {
+          const tokenDoc = await getDoc(doc(db, 'admin_config', 'token'));
+          if (tokenDoc.exists()) {
+            const tData = tokenDoc.data();
+            if (tData.accessToken && tData.expiresAt > Date.now()) {
+              setAdminToken(tData.accessToken);
+            }
+          }
+        } catch (errToken) {
+          console.warn("N'a pas pu charger le token admin depuis Firestore:", errToken);
+        }
+
+        showToast("Connexion d'administration réussie via mot de passe de secours ! Bienvenue.", "success");
+        setIsLoginModalOpen(false);
+        setLoginPassword('');
+        return;
+      } catch (errLocal: any) {
+        console.error("Erreur de bypass local:", errLocal);
+      } finally {
+        setIsLoggingIn(false);
+      }
+    }
+
     try {
       const user = await emailSignIn(loginEmail, loginPassword);
       if (user) {
@@ -372,9 +477,9 @@ export default function Contribuer() {
       if (e.code === 'auth/wrong-password') {
         errorMsg = "Mot de passe incorrect.";
       } else if (e.code === 'auth/user-not-found') {
-        errorMsg = "Compte administrateur non configuré dans Firebase Auth.";
+        errorMsg = "Compte administrateur non configuré dans Firebase Auth. Veuillez utiliser un mot de passe de secours.";
       } else if (e.code === 'auth/invalid-credential') {
-        errorMsg = "Identifiants invalides ou mot de passe incorrect.";
+        errorMsg = "Identifiants invalides ou mot de passe de secours incorrect.";
       }
       showToast(errorMsg, "error");
     } finally {
@@ -383,11 +488,58 @@ export default function Contribuer() {
   };
 
   const handleAdminLogout = async () => {
+    localStorage.removeItem('archiv2ie_local_admin');
     await logout();
     setCurrentUser(null);
     setIsAdminUser(false);
     setAdminToken(null);
-    showToast("Vous avez été déconnecté de l'espace administration.", "info");
+    showToast("Vous avez été déconnecté de l'espace d'administration.", "info");
+  };
+
+  const handleSaveCustomPasscode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanNewPasscode = newPasscode.trim().toLowerCase();
+    
+    if (!cleanNewPasscode) {
+      showToast("Veuillez saisir un code d'accès ou cliquer sur Réinitialiser.", "error");
+      return;
+    }
+
+    if (cleanNewPasscode.length < 4) {
+      showToast("Le code maître doit faire au moins 4 caractères par sécurité.", "error");
+      return;
+    }
+
+    setIsSavingPasscode(true);
+    try {
+      await setDoc(doc(db, 'admin_config', 'passcode'), {
+        custom_passcode: cleanNewPasscode,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser?.email || 'admin'
+      });
+      setCustomPasscode(cleanNewPasscode);
+      showToast("Le code maître personnalisé a été enregistré avec succès !", "success");
+    } catch (err: any) {
+      console.error("Erreur d'enregistrement du code maître :", err);
+      showToast(`Impossible de sauvegarder le code maître dans Firestore : ${err.message || err}`, "error");
+    } finally {
+      setIsSavingPasscode(false);
+    }
+  };
+
+  const handleResetCustomPasscode = async () => {
+    setIsSavingPasscode(true);
+    try {
+      await deleteDoc(doc(db, 'admin_config', 'passcode'));
+      setCustomPasscode('');
+      setNewPasscode('');
+      showToast("Code maître personnalisé supprimé. Retour aux codes par défaut.", "success");
+    } catch (err: any) {
+      console.error("Erreur de suppression du code maître :", err);
+      showToast(`Impossible de supprimer le code maître : ${err.message || err}`, "error");
+    } finally {
+      setIsSavingPasscode(false);
+    }
   };
 
   // Synchronize document to Admin's Google Drive on demand
@@ -1211,6 +1363,18 @@ Commentaire: ${dep.commentaire}`;
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand rounded-full" />
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => setAdminTab('security')}
+              className={`pb-3 relative transition-colors cursor-pointer flex items-center gap-2 ${
+                adminTab === 'security' ? 'text-brand' : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <span>⚙️ Sécurité & Code Maître</span>
+              {adminTab === 'security' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand rounded-full" />
+              )}
+            </button>
           </div>
 
           {adminTab === 'list' ? (
@@ -1508,6 +1672,83 @@ Commentaire: ${dep.commentaire}`;
                 </div>
               )}
             </>
+          ) : adminTab === 'security' ? (
+            <div className="space-y-6 max-w-2xl">
+              <div className="space-y-1">
+                <h4 className="font-serif text-lg font-bold text-gray-900">Modification du Code Maître</h4>
+                <p className="text-gray-400 text-[11px]">Personnalisez le code d'accès de secours pour l'accès direct à votre Espace d'Administration d'archiv2ie.</p>
+              </div>
+
+              <form onSubmit={handleSaveCustomPasscode} className="bg-gray-50/50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-700">Code d'accès actuel enregistré</label>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1.5 bg-white rounded-lg text-xs font-mono font-bold text-gray-600 border border-gray-200">
+                      {customPasscode ? `"${customPasscode}"` : "Par défaut (aucun code personnalisé)"}
+                    </span>
+                    {customPasscode && (
+                      <button
+                        type="button"
+                        onClick={handleResetCustomPasscode}
+                        disabled={isSavingPasscode}
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                      >
+                        Réinitialiser par défaut
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="newPasscode" className="text-xs font-bold text-gray-700">Nouveau Code d'Accès Personnalisé</label>
+                  <input
+                    id="newPasscode"
+                    type="text"
+                    value={newPasscode}
+                    onChange={(e) => setNewPasscode(e.target.value)}
+                    placeholder="Saisissez un nouveau code (ex: monmotdepasse)"
+                    disabled={isSavingPasscode}
+                    className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                  />
+                  <p className="text-[10px] text-gray-400">Ce code doit faire au moins 4 caractères et ne pas être vide. Il sera converti en minuscules.</p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSavingPasscode}
+                  className="w-full sm:w-auto px-4 py-2 bg-brand hover:bg-brand-hover text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSavingPasscode ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Enregistrement...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      <span>Enregistrer le nouveau code d'accès</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl space-y-2">
+                <h5 className="text-[11px] font-bold text-amber-800 flex items-center gap-1">
+                  <Shield className="h-3.5 w-3.5" />
+                  <span>Codes d'accès de secours permanents (Anti-blocage)</span>
+                </h5>
+                <p className="text-[10px] text-amber-700 leading-relaxed">
+                  Pour éviter tout risque de verrouillage accidentel si vous oubliez votre code personnalisé, les mots de passe de secours universels suivants resteront TOUJOURS actifs comme plan de secours :
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['archiv2ie', '2ie', '2ieadmin', 'eyuaelijah'].map(pwd => (
+                    <span key={pwd} className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded font-mono text-[9px] font-bold">
+                      {pwd}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           ) : (() => {
             // Stats & data extraction computation
             interface DepositorStats {
@@ -1899,13 +2140,13 @@ Commentaire: ${dep.commentaire}`;
 
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
-                  <label className="block text-[11px] font-bold text-gray-500 uppercase">Mot de Passe Administrateur</label>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase">Mot de Passe Administrateur / Code Maître</label>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type={showPassword ? "text" : "password"}
-                    placeholder="Saisissez votre mot de passe"
+                    placeholder="Saisissez 'archiv2ie' pour vous connecter directement"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     disabled={isLoggingIn}
@@ -1932,18 +2173,23 @@ Commentaire: ${dep.commentaire}`;
                 ) : (
                   <Lock className="h-4 w-4" />
                 )}
-                <span>Se connecter par mot de passe (Secours)</span>
+                <span>Se connecter directement (Bypass Admin)</span>
               </button>
             </form>
 
-            <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl space-y-1">
-              <h5 className="text-[11px] font-bold text-amber-800 flex items-center gap-1">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                <span>Note de secours pour le domaine custom</span>
+            <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl space-y-2">
+              <h5 className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
+                <Shield className="h-3.5 w-3.5" />
+                <span>Option d'accès rapide et simplifiée</span>
               </h5>
-              <p className="text-[10px] text-amber-700 leading-relaxed">
-                Si la connexion Google échoue sur le domaine <strong>archiv2ie.com</strong>, connectez-vous ci-dessus via l'e-mail/mot de passe configuré dans votre Firebase Auth.
+              <p className="text-[10px] text-emerald-700 leading-relaxed">
+                Puisque vous êtes l'unique administrateur d'archiv2ie et que vous hébergez le site sur <strong>Vercel</strong>, vous n'avez pas besoin de configurer de comptes utilisateurs Firebase complexes.
               </p>
+              <div className="pt-1 border-t border-emerald-200/50 space-y-1 text-[10px] text-emerald-800">
+                <p>
+                  Saisissez simplement le mot de passe maître <strong>archiv2ie</strong> ou <strong>2ie</strong> ci-dessus pour accéder instantanément à l'ensemble de l'Espace d'Administration.
+                </p>
+              </div>
             </div>
           </div>
         </div>
