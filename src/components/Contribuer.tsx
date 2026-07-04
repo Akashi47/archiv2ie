@@ -19,7 +19,10 @@ import {
   FolderOpen,
   CheckCircle,
   HelpCircle,
-  Search
+  Search,
+  Mail,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { 
   collection, 
@@ -33,7 +36,7 @@ import {
   updateDoc 
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
-import { db, googleSignIn, logout, ADMIN_EMAIL, initAuth } from '../firebase';
+import { db, googleSignIn, logout, ADMIN_EMAIL, initAuth, emailSignIn } from '../firebase';
 
 // ID du dossier Google Drive cible pour archiv2ie
 export const TARGET_DRIVE_FOLDER_ID = '1VOjv5qxNbFLUvRc0BShinaoOM3OF5jBxDIRJt7MEhDqrBtiLX7wtvbLGFj1WpCu8U1ESC3ob';
@@ -125,6 +128,12 @@ export default function Contribuer() {
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
+
+  // Login Modal States
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [loginEmail, setLoginEmail] = useState<string>('eyuaelijah@gmail.com');
+  const [loginPassword, setLoginPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
 
   // Firestore Tracking Submissions
   const [firestoreDeposits, setFirestoreDeposits] = useState<any[]>([]);
@@ -290,7 +299,11 @@ export default function Contribuer() {
   }, [isAdminUser]);
 
   // Admin login flow
-  const handleAdminLogin = async () => {
+  const handleAdminLogin = () => {
+    setIsLoginModalOpen(true);
+  };
+
+  const handleGoogleLogin = async () => {
     setIsLoggingIn(true);
     try {
       const result = await googleSignIn();
@@ -314,12 +327,55 @@ export default function Contribuer() {
               adminEmail: ADMIN_EMAIL
             });
           }
-          showToast("Connexion réussie ! Bienvenue sur l'espace admin d'archiv2ie.", "success");
+          showToast("Connexion réussie avec Google ! Bienvenue sur l'espace admin d'archiv2ie.", "success");
+          setIsLoginModalOpen(false);
         }
       }
     } catch (e: any) {
       console.error("La connexion admin a échoué:", e);
-      showToast("Erreur de connexion avec Google. Assurez-vous d'utiliser votre compte administrateur.", "error");
+      showToast("Erreur de connexion avec Google. Si cela persiste, utilisez la connexion par mot de passe de secours.", "error");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginPassword) {
+      showToast("Veuillez saisir votre mot de passe.", "error");
+      return;
+    }
+    setIsLoggingIn(true);
+    try {
+      const user = await emailSignIn(loginEmail, loginPassword);
+      if (user) {
+        if (user.email !== ADMIN_EMAIL) {
+          showToast(`Accès refusé. Seul le compte administrateur "${ADMIN_EMAIL}" est autorisé.`, "error");
+          await logout();
+          setCurrentUser(null);
+          setIsAdminUser(false);
+          setAdminToken(null);
+        } else {
+          setIsAdminUser(true);
+          setCurrentUser(user);
+          // E-mail session doesn't carry a Google Drive access token natively
+          setAdminToken(null);
+          showToast("Connexion réussie ! Bienvenue sur l'espace admin d'archiv2ie.", "success");
+          setIsLoginModalOpen(false);
+          setLoginPassword('');
+        }
+      }
+    } catch (e: any) {
+      console.error("La connexion admin par e-mail a échoué:", e);
+      let errorMsg = "Erreur de connexion. Vérifiez vos identifiants ou votre mot de passe.";
+      if (e.code === 'auth/wrong-password') {
+        errorMsg = "Mot de passe incorrect.";
+      } else if (e.code === 'auth/user-not-found') {
+        errorMsg = "Compte administrateur non configuré dans Firebase Auth.";
+      } else if (e.code === 'auth/invalid-credential') {
+        errorMsg = "Identifiants invalides ou mot de passe incorrect.";
+      }
+      showToast(errorMsg, "error");
     } finally {
       setIsLoggingIn(false);
     }
@@ -1756,6 +1812,140 @@ Commentaire: ${dep.commentaire}`;
             );
           })()}
         </section>
+      )}
+
+
+      {/* Admin Login Selection Modal */}
+      {isLoginModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-2xl max-w-md w-full p-6 sm:p-8 space-y-6 relative animate-in fade-in zoom-in-95 duration-200">
+            <button
+              type="button"
+              onClick={() => setIsLoginModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 font-bold text-lg cursor-pointer w-8 h-8 rounded-full hover:bg-gray-50 flex items-center justify-center"
+            >
+              ×
+            </button>
+
+            <div className="text-center space-y-2">
+              <div className="mx-auto w-12 h-12 bg-brand/10 text-brand rounded-2xl flex items-center justify-center">
+                <Lock className="h-6 w-6" />
+              </div>
+              <h3 className="font-serif text-xl sm:text-2xl font-bold text-gray-900">Espace Administration</h3>
+              <p className="text-xs text-gray-500 max-w-xs mx-auto">
+                Connectez-vous pour modérer les dépôts archivés et synchroniser les documents de 2iE.
+              </p>
+            </div>
+
+            {/* Option 1: Google Sign-In */}
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={isLoggingIn}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 font-bold rounded-xl text-xs sm:text-sm transition-all shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {isLoggingIn ? (
+                  <RefreshCw className="h-4 w-4 animate-spin text-gray-500" />
+                ) : (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.53-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-8.77z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.11 0-5.74-2.11-6.68-4.96H1.21v3.15C3.18 21.88 7.39 24 12 24z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.32 14.24A7.16 7.16 0 0 1 5 12c0-.79.13-1.57.38-2.34V6.51H1.21A11.94 11.94 0 0 0 0 12c0 1.92.45 3.74 1.21 5.39l4.11-3.15z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.39 0 3.18 2.12 1.21 5.39l4.11 3.15c.94-2.85 3.57-4.96 6.68-4.96z"
+                    />
+                  </svg>
+                )}
+                <span>Se connecter avec Google (Recommandé)</span>
+              </button>
+              <p className="text-[10px] text-gray-400 text-center">
+                Permet la sauvegarde et la synchronisation automatique directe vers votre Google Drive.
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 text-xs text-gray-400 font-bold uppercase tracking-wider">
+              <div className="h-[1px] bg-gray-100 flex-1" />
+              <span>OU</span>
+              <div className="h-[1px] bg-gray-100 flex-1" />
+            </div>
+
+            {/* Option 2: Email & Password */}
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-gray-500 uppercase">Adresse E-mail Admin</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="email"
+                    disabled
+                    value={loginEmail}
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-500 outline-none cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase">Mot de Passe Administrateur</label>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Saisissez votre mot de passe"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    disabled={isLoggingIn}
+                    className="w-full pl-10 pr-10 py-2.5 bg-gray-50 focus:bg-white border border-gray-200 focus:border-brand focus:ring-2 focus:ring-brand/10 rounded-xl text-xs transition-all outline-none"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isLoggingIn ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Lock className="h-4 w-4" />
+                )}
+                <span>Se connecter par mot de passe (Secours)</span>
+              </button>
+            </form>
+
+            <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl space-y-1">
+              <h5 className="text-[11px] font-bold text-amber-800 flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                <span>Note de secours pour le domaine custom</span>
+              </h5>
+              <p className="text-[10px] text-amber-700 leading-relaxed">
+                Si la connexion Google échoue sur le domaine <strong>archiv2ie.com</strong>, connectez-vous ci-dessus via l'e-mail/mot de passe configuré dans votre Firebase Auth.
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
 
