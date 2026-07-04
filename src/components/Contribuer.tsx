@@ -128,6 +128,8 @@ export default function Contribuer() {
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [adminToken, setAdminToken] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState<boolean>(false);
+  const [showAdminTrigger, setShowAdminTrigger] = useState<boolean>(false);
+  const [titleClicks, setTitleClicks] = useState<number>(0);
 
   // Login Modal States
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
@@ -225,6 +227,17 @@ export default function Contribuer() {
     link.click();
     document.body.removeChild(link);
   };
+
+  // Check URL parameter or localStorage for admin access trigger
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('admin') === 'true') {
+      setShowAdminTrigger(true);
+      localStorage.setItem('archiv2ie_show_admin_button', 'true');
+    } else if (localStorage.getItem('archiv2ie_show_admin_button') === 'true') {
+      setShowAdminTrigger(true);
+    }
+  }, []);
 
   // Load custom master passcode when user is admin
   useEffect(() => {
@@ -913,7 +926,21 @@ Commentaire: ${dep.commentaire}`;
       {/* Header and page Title */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-gray-100">
         <div className="space-y-3 max-w-4xl">
-          <h1 className="font-serif text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">
+          <h1 
+            onClick={() => {
+              const newClicks = titleClicks + 1;
+              setTitleClicks(newClicks);
+              if (newClicks >= 5) {
+                const nextState = !showAdminTrigger;
+                setShowAdminTrigger(nextState);
+                localStorage.setItem('archiv2ie_show_admin_button', nextState ? 'true' : 'false');
+                showToast(nextState ? "Bouton Espace Administration révélé !" : "Bouton Espace Administration masqué !", "info");
+                setTitleClicks(0);
+              }
+            }}
+            className="font-serif text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight cursor-default select-none transition-all active:scale-[0.99]"
+            title="Savoir-faire et partage"
+          >
             Contribuer au Projet
           </h1>
           <p className="text-gray-500 text-sm sm:text-base leading-relaxed">
@@ -942,11 +969,11 @@ Commentaire: ${dep.commentaire}`;
                   <span>Déconnexion</span>
                 </button>
               </div>
-            ) : (
+            ) : showAdminTrigger ? (
               <button
                 onClick={handleAdminLogin}
                 disabled={isLoggingIn}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50 animate-fade-in"
               >
                 {isLoggingIn ? (
                   <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -955,7 +982,7 @@ Commentaire: ${dep.commentaire}`;
                 )}
                 <span>Espace Administration</span>
               </button>
-            )
+            ) : null
           )}
         </div>
       </div>
