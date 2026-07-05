@@ -166,6 +166,10 @@ export default function Contribuer() {
   const [isSavingPasscode, setIsSavingPasscode] = useState<boolean>(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // Success confirmation screen state
+  const [showSubmissionSuccess, setShowSubmissionSuccess] = useState<boolean>(false);
+  const [successDetails, setSuccessDetails] = useState<{ nom: string; nomDoc: string } | null>(null);
+
   // Toast notifications state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -372,13 +376,24 @@ export default function Contribuer() {
     }
 
     setIsLoadingDeposits(true);
-    const q = query(collection(db, 'deposits'), orderBy('createdAt', 'desc'));
+    const q = collection(db, 'deposits');
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list: any[] = [];
       snapshot.forEach((doc) => {
         list.push({ id: doc.id, ...doc.data() });
       });
+      
+      // Sort client-side by createdAt descending to ensure full compatibility with older/newer schemas
+      list.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (timeA !== timeB) {
+          return timeB - timeA;
+        }
+        return (b.id || '').localeCompare(a.id || '');
+      });
+
       setFirestoreDeposits(list);
       setIsLoadingDeposits(false);
     }, (err) => {
@@ -884,8 +899,10 @@ Commentaire: ${dep.commentaire}`;
       let driveFileId = '';
       let driveStatus = 'success'; // Les fichiers atterrissent directement sur le Drive via le Google Apps Script (sans protocole/token)
 
-      // Safe Firestore limit: 1MB document limit, Base64 adds 33% overhead. Max binary size ~750KB.
-      const isTooLargeForFirestore = selectedFile.size > 750000;
+      // Safe Firestore limit: 1MB document limit, but we set a very conservative threshold (50KB)
+      // to ensure lightning-fast Firestore writes on mobile networks and prevent network timeouts.
+      // Large files are already saved permanently and securely on Google Drive.
+      const isTooLargeForFirestore = selectedFile.size > 50000;
       const base64ToStore = isTooLargeForFirestore ? '' : base64Data;
 
       // 4. Save metadata (+ base64 if small) to central cloud database (Firestore)
@@ -897,7 +914,7 @@ Commentaire: ${dep.commentaire}`;
         statut: formData.statut,
         filiere: mappedFiliere,
         semestre: formData.semestre,
-        nomDoc: formData.nomDoc,
+        nomDoc: formData.nomDoc || selectedFile.name,
         matiere: formData.matiere,
         typeDoc: formData.typeDoc,
         commentaire: formData.commentaire || 'Aucun commentaire',
@@ -979,7 +996,14 @@ Commentaire: ${dep.commentaire}`;
       // Unlock button and reset state immediately to show fast, modern responsive feedback!
       setIsSubmitting(false);
 
-      showToast(`Merci pour votre contribution, ${formData.nom} ! Votre document a été enregistré avec succès et téléversé directement dans le dossier Google Drive d'archiv2ie. 🚀`, 'success');
+      // Save success details before resetting form states to show them in the confirmation view
+      setSuccessDetails({
+        nom: formData.nom,
+        nomDoc: formData.nomDoc || selectedFile.name
+      });
+      setShowSubmissionSuccess(true);
+
+      showToast(`Merci pour votre contribution, ${formData.nom} ! Votre document "${formData.nomDoc || selectedFile.name}" a bien été envoyé à l'équipe de archiv2ie.`, 'success');
 
       // Reset states
       setFormData({
@@ -1176,265 +1200,287 @@ Commentaire: ${dep.commentaire}`;
 
       {/* Interactive Form Section */}
       <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 sm:p-8 space-y-6">
-        <div>
-          <h2 className="font-serif text-2xl font-bold text-gray-900">Partager vos ressources pédagogiques</h2>
-          <p className="text-gray-500 text-xs mt-1">
-            Chaque cours partagé est un phare pour les promotions d'étudiants à venir.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          
-          {/* Row 1: Nom & Email */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="space-y-1.5">
-              <label htmlFor="nom" className="text-xs font-bold text-gray-700">Nom & Prénoms</label>
-              <input
-                id="nom"
-                name="nom"
-                type="text"
-                required
-                value={formData.nom}
-                onChange={handleInputChange}
-                placeholder="Ex: EL YAH"
-                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
-              />
+        {showSubmissionSuccess ? (
+          <div className="text-center py-8 px-4 max-w-xl mx-auto space-y-6 animate-fade-in">
+            <div className="mx-auto w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+              <Check className="h-8 w-8" />
             </div>
             
-            <div className="space-y-1.5">
-              <label htmlFor="email" className="text-xs font-bold text-gray-700">Adresse email universitaire</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="Ex: votre.nom@2ie-edu.org"
-                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
-              />
+            <div className="space-y-2">
+              <h3 className="font-serif text-2xl font-bold text-gray-900">Document soumis avec succès ! 🎉</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Merci pour votre contribution, <strong>{successDetails?.nom}</strong> ! Votre document <strong>"{successDetails?.nomDoc}"</strong> a bien été envoyé à l'équipe de archiv2ie.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSubmissionSuccess(false);
+                  setSuccessDetails(null);
+                }}
+                className="px-6 py-3 bg-brand hover:bg-brand-hover text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm hover:shadow"
+              >
+                Déposer un autre document 📤
+              </button>
             </div>
           </div>
+        ) : (
+          <>
+            <div>
+              <h2 className="font-serif text-2xl font-bold text-gray-900">Partager vos ressources pédagogiques</h2>
+              <p className="text-gray-500 text-xs mt-1">
+                Chaque cours partagé est un phare pour les promotions d'étudiants à venir.
+              </p>
+            </div>
 
-          {/* Row 2: Status */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-700 block">Vous êtes ?</label>
-            <div className="flex flex-wrap gap-4">
-              {['Etudiant', 'Enseignant', 'Ancien étudiant'].map((role) => (
-                <label key={role} className="inline-flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              
+              {/* Row 1: Nom & Email */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label htmlFor="nom" className="text-xs font-bold text-gray-700">Nom & Prénoms</label>
                   <input
-                    type="radio"
-                    name="statut"
-                    value={role}
-                    checked={formData.statut === role}
+                    id="nom"
+                    name="nom"
+                    type="text"
+                    required
+                    value={formData.nom}
                     onChange={handleInputChange}
-                    className="h-4 w-4 text-brand focus:ring-brand/30"
+                    placeholder="Ex: EL YAH"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
                   />
-                  <span>{role === 'Etudiant' ? 'Étudiant' : role}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label htmlFor="email" className="text-xs font-bold text-gray-700">Adresse email universitaire</label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="Ex: votre.nom@2ie-edu.org"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                  />
+                </div>
+              </div>
 
-          {/* Row 3: Filiere and dynamic Semester dropdown */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="space-y-1.5">
-              <label htmlFor="filiere" className="text-xs font-bold text-gray-700">Filière concernée</label>
-              <select
-                id="filiere"
-                name="filiere"
-                required
-                value={formData.filiere}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all cursor-pointer"
-              >
-                <option value="">Sélectionner une filière</option>
-                <option value="tc">Tronc Commun (S1 à S4)</option>
-                <option value="gee">Génie Électrique & Énergétique (GEE)</option>
-                <option value="gc-btp">Génie Civil & BTP (GC-BTP)</option>
-                <option value="geaah">Génie Eau, Assainissement & AH (GEAAH)</option>
-              </select>
-            </div>
+              {/* Row 2: Status */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-700 block">Vous êtes ?</label>
+                <div className="flex flex-wrap gap-4">
+                  {['Etudiant', 'Enseignant', 'Ancien étudiant'].map((role) => (
+                    <label key={role} className="inline-flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="statut"
+                        value={role}
+                        checked={formData.statut === role}
+                        onChange={handleInputChange}
+                        className="h-4 w-4 text-brand focus:ring-brand/30"
+                      />
+                      <span>{role === 'Etudiant' ? 'Étudiant' : role}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="semestre" className="text-xs font-bold text-gray-700">Semestre concerné</label>
-              <select
-                id="semestre"
-                name="semestre"
-                required
-                disabled={!formData.filiere}
-                value={formData.semestre}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all cursor-pointer disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {!formData.filiere ? "Sélectionnez d'abord une filière" : "Sélectionner un semestre"}
-                </option>
-                {semesters.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Row 4: Matiere, Type of Doc, Document name */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="space-y-1.5">
-              <label htmlFor="matiere" className="text-xs font-bold text-gray-700">Matière / UV académique</label>
-              <input
-                id="matiere"
-                name="matiere"
-                type="text"
-                required
-                value={formData.matiere}
-                onChange={handleInputChange}
-                placeholder="Ex: Béton Armé 1 / Hydraulique Générale"
-                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="typeDoc" className="text-xs font-bold text-gray-700">Type de ressource</label>
-              <select
-                id="typeDoc"
-                name="typeDoc"
-                required
-                value={formData.typeDoc}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all cursor-pointer"
-              >
-                <option value="Cours">Cours Complet</option>
-                <option value="Sujet d'examen">Sujet d'Examen / DS</option>
-                <option value="TD/TP">TD ou TP Corrigé</option>
-                <option value="Rapport PFE">Rapport de PFE / Stage</option>
-                <option value="Fiche récap">Fiche de révision</option>
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="nomDoc" className="text-xs font-bold text-gray-700">Nom du document</label>
-              <input
-                id="nomDoc"
-                name="nomDoc"
-                type="text"
-                required
-                value={formData.nomDoc}
-                onChange={handleInputChange}
-                placeholder="Ex: TD Flexion Simple / DS 2025"
-                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Commentaire */}
-          <div className="space-y-1.5">
-            <label htmlFor="commentaire" className="text-xs font-bold text-gray-700">Précisions ou commentaires additionnels (Facultatif)</label>
-            <textarea
-              id="commentaire"
-              name="commentaire"
-              rows={3}
-              value={formData.commentaire}
-              onChange={handleInputChange}
-              placeholder="Ex: Corrigé validé par le professeur Coulibaly. Manque juste la question 3 du TP."
-              className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all resize-none"
-            />
-          </div>
-
-          {/* Secure File drag and drop Area */}
-          <div className="space-y-2">
-            <span className="text-xs font-bold text-gray-700 block">Téléversement du document numérique</span>
-            
-            <div 
-              onDragEnter={handleDrag}
-              onDragOver={handleDrag}
-              onDragLeave={handleDrag}
-              onDrop={handleDrop}
-              onClick={triggerFileSelect}
-              className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-3 ${
-                dragActive 
-                  ? 'border-brand bg-brand/5 scale-[0.99]' 
-                  : selectedFile 
-                    ? 'border-emerald-200 bg-emerald-50/10' 
-                    : 'border-gray-200 bg-gray-50/50 hover:bg-gray-50 hover:border-gray-300'
-              }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.xlsx,.xls,.doc,.docx,.zip,.rar"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-
-              {selectedFile ? (
-                <>
-                  <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl">
-                    <File className="h-6 w-6 animate-pulse" />
-                  </div>
-                  <div>
-                    <strong className="block text-sm text-gray-800 break-all">{selectedFile.name}</strong>
-                    <span className="text-xs text-gray-400">
-                      {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Prêt pour l'envoi
-                    </span>
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedFile(null);
-                      setBase64Data('');
-                    }}
-                    className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-2xs font-bold rounded-lg transition-all"
+              {/* Row 3: Filiere and dynamic Semester dropdown */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <label htmlFor="filiere" className="text-xs font-bold text-gray-700">Filière concernée</label>
+                  <select
+                    id="filiere"
+                    name="filiere"
+                    required
+                    value={formData.filiere}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all cursor-pointer"
                   >
-                    Retirer le fichier
-                  </button>
-                </>
-              ) : (
-                <>
-                  <div className="p-3 bg-brand/10 text-brand rounded-xl">
-                    <Upload className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <strong className="block text-sm text-gray-800">Glissez-déposez votre fichier ici</strong>
-                    <span className="text-xs text-gray-400">
-                      Formats acceptés : PDF, Excel, Word, ZIP, RAR (Max: 15MB)
-                    </span>
-                  </div>
-                  <span className="px-3 py-1.5 bg-brand/10 text-brand text-xs font-bold rounded-xl hover:bg-brand/15 transition-all">
-                    Parcourir mes dossiers
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
+                    <option value="">Sélectionner une filière</option>
+                    <option value="tc">Tronc Commun (S1 à S4)</option>
+                    <option value="gee">Génie Électrique & Énergétique (GEE)</option>
+                    <option value="gc-btp">Génie Civil & BTP (GC-BTP)</option>
+                    <option value="geaah">Génie Eau, Assainissement & AH (GEAAH)</option>
+                  </select>
+                </div>
 
-          {/* Submit button */}
-          <div className="flex justify-end pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting || !selectedFile}
-              className={`w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-white shadow-md shadow-brand/10 transition-all flex items-center justify-center gap-2 ${
-                isSubmitting 
-                  ? 'bg-brand/50 cursor-not-allowed' 
-                  : !selectedFile 
-                    ? 'bg-gray-300 cursor-not-allowed shadow-none' 
-                    : 'bg-brand hover:bg-brand-hover hover:shadow-lg'
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  <span>Traitement et enregistrement... ⏳</span>
-                </>
-              ) : (
-                <>
+                <div className="space-y-1.5">
+                  <label htmlFor="semestre" className="text-xs font-bold text-gray-700">Semestre concerné</label>
+                  <select
+                    id="semestre"
+                    name="semestre"
+                    required
+                    disabled={!formData.filiere}
+                    value={formData.semestre}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all cursor-pointer disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {!formData.filiere ? "Sélectionnez d'abord une filière" : "Sélectionner un semestre"}
+                    </option>
+                    {semesters.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 4: Matiere, Type of Doc, Document name */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="space-y-1.5">
+                  <label htmlFor="matiere" className="text-xs font-bold text-gray-700">Matière / UV académique</label>
+                  <input
+                    id="matiere"
+                    name="matiere"
+                    type="text"
+                    required
+                    value={formData.matiere}
+                    onChange={handleInputChange}
+                    placeholder="Ex: Béton Armé 1 / Hydraulique Générale"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="typeDoc" className="text-xs font-bold text-gray-700">Type de ressource</label>
+                  <select
+                    id="typeDoc"
+                    name="typeDoc"
+                    required
+                    value={formData.typeDoc}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all cursor-pointer"
+                  >
+                    <option value="Cours">Cours Complet</option>
+                    <option value="Sujet d'examen">Sujet d'Examen / DS</option>
+                    <option value="TD/TP">TD ou TP Corrigé</option>
+                    <option value="Rapport PFE">Rapport de PFE / Stage</option>
+                    <option value="Fiche récap">Fiche de révision</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="nomDoc" className="text-xs font-bold text-gray-700">Nom du document</label>
+                  <input
+                    id="nomDoc"
+                    name="nomDoc"
+                    type="text"
+                    required
+                    value={formData.nomDoc}
+                    onChange={handleInputChange}
+                    placeholder="Ex: TD Flexion Simple / DS 2025"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Commentaire */}
+              <div className="space-y-1.5">
+                <label htmlFor="commentaire" className="text-xs font-bold text-gray-700">Précisions ou commentaires additionnels (Facultatif)</label>
+                <textarea
+                  id="commentaire"
+                  name="commentaire"
+                  rows={3}
+                  value={formData.commentaire}
+                  onChange={handleInputChange}
+                  placeholder="Ex: Corrigé validé par le professeur Coulibaly. Manque juste la question 3 du TP."
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all resize-none"
+                />
+              </div>
+
+              {/* Secure File drag and drop Area */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-gray-700 block">Téléversement du document numérique</span>
+                
+                <div 
+                  onDragEnter={handleDrag}
+                  onDragOver={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDrop={handleDrop}
+                  onClick={triggerFileSelect}
+                  className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center space-y-3 ${
+                    dragActive 
+                      ? 'border-brand bg-brand/5 scale-[0.99]' 
+                      : selectedFile 
+                        ? 'border-emerald-200 bg-emerald-50/10' 
+                        : 'border-gray-200 bg-gray-50/50 hover:bg-gray-50 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.xlsx,.xls,.doc,.docx,.zip,.rar"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+
+                  {selectedFile ? (
+                    <>
+                      <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl">
+                        <File className="h-6 w-6 animate-pulse" />
+                      </div>
+                      <div>
+                        <strong className="block text-sm text-gray-800 break-all">{selectedFile.name}</strong>
+                        <span className="text-xs text-gray-400">
+                          {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Prêt pour l'envoi
+                        </span>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile(null);
+                          setBase64Data('');
+                        }}
+                        className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 text-2xs font-bold rounded-lg transition-all"
+                      >
+                        Retirer le fichier
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="p-3 bg-brand/10 text-brand rounded-xl">
+                        <Upload className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <strong className="block text-sm text-gray-800">Glissez-déposez votre fichier ici</strong>
+                        <span className="text-xs text-gray-400">
+                          Formats acceptés : PDF, Excel, Word, ZIP, RAR (Max: 15MB)
+                        </span>
+                      </div>
+                      <span className="px-3 py-1.5 bg-brand/10 text-brand text-xs font-bold rounded-xl hover:bg-brand/15 transition-all">
+                        Parcourir mes dossiers
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Submit button */}
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !selectedFile}
+                  className={`w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold text-white shadow-md shadow-brand/10 transition-all flex items-center justify-center gap-2 ${
+                    isSubmitting 
+                      ? 'bg-brand/50 cursor-not-allowed' 
+                      : !selectedFile 
+                        ? 'bg-gray-300 cursor-not-allowed shadow-none' 
+                        : 'bg-brand hover:bg-brand-hover hover:shadow-lg'
+                  }`}
+                >
+                  {isSubmitting && <RefreshCw className="h-4 w-4 animate-spin text-white" />}
                   <span>Soumettre le document 📤</span>
-                </>
-              )}
-            </button>
-          </div>
+                </button>
+              </div>
 
-        </form>
+            </form>
+          </>
+        )}
       </section>
 
       {/* Captured Submissions / Suivi & Récupération des dépôts (VISIBLE ONLY TO ADMIN) */}
