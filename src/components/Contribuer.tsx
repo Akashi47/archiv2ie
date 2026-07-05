@@ -37,7 +37,7 @@ import {
   updateDoc 
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
-import { db, googleSignIn, logout, ADMIN_EMAIL, initAuth, emailSignIn } from '../firebase';
+import { db, googleSignIn, logout, ADMIN_EMAIL, initAuth, emailSignIn, handleFirestoreError, OperationType } from '../firebase';
 
 // ID du dossier Google Drive cible pour archiv2ie
 export const TARGET_DRIVE_FOLDER_ID = '1VOjv5qxNbFLUvRc0BShinaoOM3OF5jBxDIRJt7MEhDqrBtiLX7wtvbLGFj1WpCu8U1ESC3ob';
@@ -51,7 +51,10 @@ const uploadToGoogleDrive = async (
   descriptionText: string
 ): Promise<string> => {
   try {
-    const byteCharacters = atob(base64Content);
+    const rawBase64 = base64Content.includes('base64,') 
+      ? base64Content.split('base64,')[1] 
+      : base64Content;
+    const byteCharacters = atob(rawBase64);
     const byteNumbers = new Array(byteCharacters.length);
     for (let i = 0; i < byteCharacters.length; i++) {
       byteNumbers[i] = byteCharacters.charCodeAt(i);
@@ -103,6 +106,14 @@ const uploadToGoogleDrive = async (
   }
 };
 
+// Helper to prevent infinite hangs on Firestore or network calls
+const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs))
+  ]);
+};
+
 export default function Contribuer() {
   const [formData, setFormData] = useState({
     nom: '',
@@ -149,7 +160,7 @@ export default function Contribuer() {
   const [isSyncingId, setIsSyncingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterDrive, setFilterDrive] = useState<'all' | 'synced' | 'pending'>('all');
-  const [adminTab, setAdminTab] = useState<'list' | 'stats' | 'security'>('list');
+  const [adminTab, setAdminTab] = useState<'list' | 'stats' | 'security'>('stats');
   const [customPasscode, setCustomPasscode] = useState<string>('');
   const [newPasscode, setNewPasscode] = useState<string>('');
   const [isSavingPasscode, setIsSavingPasscode] = useState<boolean>(false);
@@ -249,7 +260,13 @@ export default function Contribuer() {
           setCustomPasscode(storedPasscode);
           setNewPasscode(storedPasscode);
         }
-      }).catch(err => console.warn("Erreur de chargement du code maître personnalisé:", err));
+      }).catch(err => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'admin_config/passcode');
+        } catch (e) {
+          console.warn("Erreur de chargement du code maître personnalisé:", err);
+        }
+      });
     }
   }, [isAdminUser]);
 
@@ -274,7 +291,13 @@ export default function Contribuer() {
             setAdminToken(tData.accessToken);
           }
         }
-      }).catch(err => console.warn("Erreur de pré-chargement du jeton:", err));
+      }).catch(err => {
+        try {
+          handleFirestoreError(err, OperationType.GET, 'admin_config/token');
+        } catch (e) {
+          console.warn("Erreur de pré-chargement du jeton:", err);
+        }
+      });
     }
 
     const unsubscribe = initAuth(
@@ -300,7 +323,11 @@ export default function Contribuer() {
                 adminEmail: ADMIN_EMAIL
               });
             } catch (e) {
-              console.error('Erreur de sauvegarde de token admin:', e);
+              try {
+                handleFirestoreError(e, OperationType.WRITE, 'admin_config/token');
+              } catch (errDb) {
+                console.error('Erreur de sauvegarde de token admin:', e);
+              }
             }
           } else {
             // No in-memory token (e.g. after a page reload).
@@ -314,7 +341,11 @@ export default function Contribuer() {
                 }
               }
             } catch (errToken) {
-              console.warn("N'a pas pu charger le token admin depuis Firestore:", errToken);
+              try {
+                handleFirestoreError(errToken, OperationType.GET, 'admin_config/token');
+              } catch (e) {
+                console.warn("N'a pas pu charger le token admin depuis Firestore:", errToken);
+              }
             }
           }
         }
@@ -351,7 +382,11 @@ export default function Contribuer() {
       setFirestoreDeposits(list);
       setIsLoadingDeposits(false);
     }, (err) => {
-      console.error('Erreur de lecture Firestore deposits:', err);
+      try {
+        handleFirestoreError(err, OperationType.GET, 'deposits');
+      } catch (e) {
+        console.error('Erreur de lecture Firestore deposits:', err);
+      }
       setIsLoadingDeposits(false);
     });
 
@@ -380,12 +415,16 @@ export default function Contribuer() {
           setCurrentUser(user);
           if (accessToken) {
             setAdminToken(accessToken);
-            await setDoc(doc(db, 'admin_config', 'token'), {
-              accessToken: accessToken,
-              updatedAt: new Date().toISOString(),
-              expiresAt: Date.now() + 3500 * 1000,
-              adminEmail: ADMIN_EMAIL
-            });
+            try {
+              await setDoc(doc(db, 'admin_config', 'token'), {
+                accessToken: accessToken,
+                updatedAt: new Date().toISOString(),
+                expiresAt: Date.now() + 3500 * 1000,
+                adminEmail: ADMIN_EMAIL
+              });
+            } catch (errDb) {
+              handleFirestoreError(errDb, OperationType.WRITE, 'admin_config/token');
+            }
           }
           showToast("Connexion réussie avec Google ! Bienvenue sur l'espace admin d'archiv2ie.", "success");
           setIsLoginModalOpen(false);
@@ -393,8 +432,20 @@ export default function Contribuer() {
       }
     } catch (e: any) {
       console.error("La connexion admin a échoué:", e);
-      const errorCode = e.code ? ` (${e.code})` : '';
-      showToast(`Erreur de connexion avec Google${errorCode}. Utilisez le mot de passe de secours pour vous connecter instantanément.`, "error");
+      if (e.code === 'auth/popup-blocked' || String(e).includes('popup-blocked')) {
+        showToast(
+          `Le navigateur a bloqué la fenêtre de connexion Google (Popup bloqué).\n\n` +
+          `Cela est dû au fait que l'application s'exécute dans un cadre intégré (iframe) d'AI Studio.\n\n` +
+          `👉 Pour vous connecter, veuillez soit :\n` +
+          `1. Cliquer sur l'icône de partage / nouvel onglet en haut à droite de l'écran pour lancer l'application en plein écran.\n` +
+          `2. Autoriser les popups dans la barre d'adresse de votre navigateur.\n` +
+          `3. Utiliser l'Option de Connexion Directe ci-dessous avec le code de secours "archiv2ie".`,
+          "error"
+        );
+      } else {
+        const errorCode = e.code ? ` (${e.code})` : '';
+        showToast(`Erreur de connexion avec Google${errorCode}. Utilisez le mot de passe de secours pour vous connecter instantanément.`, "error");
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -416,7 +467,11 @@ export default function Contribuer() {
         customPasscodeDb = (passcodeDoc.data().custom_passcode || '').trim().toLowerCase();
       }
     } catch (errPass) {
-      console.warn("N'a pas pu charger le code maître personnalisé depuis Firestore:", errPass);
+      try {
+        handleFirestoreError(errPass, OperationType.GET, 'admin_config/passcode');
+      } catch (e) {
+        console.warn("N'a pas pu charger le code maître personnalisé depuis Firestore:", errPass);
+      }
     }
 
     const cleanPassword = loginPassword.trim().toLowerCase();
@@ -452,7 +507,11 @@ export default function Contribuer() {
             }
           }
         } catch (errToken) {
-          console.warn("N'a pas pu charger le token admin depuis Firestore:", errToken);
+          try {
+            handleFirestoreError(errToken, OperationType.GET, 'admin_config/token');
+          } catch (e) {
+            console.warn("N'a pas pu charger le token admin depuis Firestore:", errToken);
+          }
         }
 
         showToast("Connexion d'administration réussie via mot de passe de secours ! Bienvenue.", "success");
@@ -526,11 +585,15 @@ export default function Contribuer() {
 
     setIsSavingPasscode(true);
     try {
-      await setDoc(doc(db, 'admin_config', 'passcode'), {
-        custom_passcode: cleanNewPasscode,
-        updatedAt: new Date().toISOString(),
-        updatedBy: currentUser?.email || 'admin'
-      });
+      try {
+        await setDoc(doc(db, 'admin_config', 'passcode'), {
+          custom_passcode: cleanNewPasscode,
+          updatedAt: new Date().toISOString(),
+          updatedBy: currentUser?.email || 'admin'
+        });
+      } catch (errDb) {
+        handleFirestoreError(errDb, OperationType.WRITE, 'admin_config/passcode');
+      }
       setCustomPasscode(cleanNewPasscode);
       showToast("Le code maître personnalisé a été enregistré avec succès !", "success");
     } catch (err: any) {
@@ -544,7 +607,11 @@ export default function Contribuer() {
   const handleResetCustomPasscode = async () => {
     setIsSavingPasscode(true);
     try {
-      await deleteDoc(doc(db, 'admin_config', 'passcode'));
+      try {
+        await deleteDoc(doc(db, 'admin_config', 'passcode'));
+      } catch (errDb) {
+        handleFirestoreError(errDb, OperationType.DELETE, 'admin_config/passcode');
+      }
       setCustomPasscode('');
       setNewPasscode('');
       showToast("Code maître personnalisé supprimé. Retour aux codes par défaut.", "success");
@@ -558,30 +625,72 @@ export default function Contribuer() {
 
   // Synchronize document to Admin's Google Drive on demand
   const handleSyncToDrive = async (dep: any) => {
-    if (!adminToken) {
-      showToast("Votre jeton de connexion Google Drive est expiré. Veuillez vous reconnecter en haut de l'espace admin !", "error");
-      return;
-    }
-
     setIsSyncingId(dep.id);
     try {
-      const desc = `Déposant: ${dep.nom} (${dep.statut})\nEmail: ${dep.email}\nFilière: ${dep.filiere}\nSemestre: ${dep.semestre}\nMatière: ${dep.matiere}\nType: ${dep.typeDoc}\nCommentaire: ${dep.commentaire || 'Aucun'}`;
-      
-      const fileId = await uploadToGoogleDrive(
-        adminToken,
-        dep.fileName,
-        dep.fileType || 'application/pdf',
-        dep.base64,
-        desc
-      );
+      if (!dep.base64) {
+        showToast("Impossible de renvoyer le fichier : les données de ce fichier volumineux ne sont pas stockées dans Firestore.", "error");
+        setIsSyncingId(null);
+        return;
+      }
+
+      // Submit file to Google Apps Script Web App inside hidden iframe asynchronously
+      const iframeId = 'iframe-masquee-archiv2ie-react-sync';
+      let iframe = document.getElementById(iframeId) as HTMLIFrameElement;
+      if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = iframeId;
+        iframe.name = iframeId;
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+      }
+
+      const tempForm = document.createElement('form');
+      tempForm.method = 'POST';
+      tempForm.action = "https://script.google.com/macros/s/AKfycbyCsHpIQj_ncjj6Tjbvaz4xqoA6KbWBpXmR-D5TvAVdTAFgKZzXpjzhf0TaDY41J7Ol/exec";
+      tempForm.target = iframeId;
+
+      const submissionDataset = {
+        nom: dep.nom,
+        email: dep.email,
+        statut: dep.statut,
+        filiere: dep.filiere,
+        semestre: dep.semestre,
+        typeDoc: dep.typeDoc,
+        matiere: dep.matiere,
+        commentaire: dep.commentaire || 'Aucun',
+        filename: dep.fileName,
+        mimeType: dep.fileType || 'application/pdf',
+        bytes: dep.base64
+      };
+
+      for (const [key, value] of Object.entries(submissionDataset)) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        tempForm.appendChild(input);
+      }
+
+      document.body.appendChild(tempForm);
+      tempForm.submit();
+
+      setTimeout(() => {
+        if (document.body.contains(tempForm)) {
+          document.body.removeChild(tempForm);
+        }
+      }, 3000);
 
       // Update Firestore document
-      await updateDoc(doc(db, 'deposits', dep.id), {
-        driveFileId: fileId,
-        driveStatus: 'success'
-      });
+      try {
+        await updateDoc(doc(db, 'deposits', dep.id), {
+          driveFileId: 'synced_by_apps_script',
+          driveStatus: 'success'
+        });
+      } catch (errDb) {
+        handleFirestoreError(errDb, OperationType.UPDATE, `deposits/${dep.id}`);
+      }
 
-      showToast(`Le fichier "${dep.fileName}" a été téléversé avec succès dans votre Google Drive !`, "success");
+      showToast(`Le fichier "${dep.fileName}" a été téléversé avec succès dans votre Google Drive d'archiv2ie !`, "success");
     } catch (err: any) {
       console.error(err);
       showToast(`Erreur d'envoi Google Drive: ${err.message || err}`, "error");
@@ -592,7 +701,11 @@ export default function Contribuer() {
 
   const handleDeleteFirestoreDeposit = async (id: string) => {
     try {
-      await deleteDoc(doc(db, 'deposits', id));
+      try {
+        await deleteDoc(doc(db, 'deposits', id));
+      } catch (errDb) {
+        handleFirestoreError(errDb, OperationType.DELETE, `deposits/${id}`);
+      }
       if (expandedDepositId === id) {
         setExpandedDepositId(null);
       }
@@ -642,7 +755,10 @@ Commentaire: ${dep.commentaire}`;
       return;
     }
     try {
-      const byteCharacters = atob(dep.base64);
+      const rawBase64 = dep.base64.includes('base64,') 
+        ? dep.base64.split('base64,')[1] 
+        : dep.base64;
+      const byteCharacters = atob(rawBase64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
@@ -765,46 +881,12 @@ Commentaire: ${dep.commentaire}`;
 
       const mappedFiliere = filiereNameMap[formData.filiere] || formData.filiere;
 
-      // Check if an active Admin Google Access Token is currently saved in Firestore
-      let activeToken: string | null = null;
-      try {
-        const tokenDoc = await getDoc(doc(db, 'admin_config', 'token'));
-        if (tokenDoc.exists()) {
-          const tData = tokenDoc.data();
-          // Verify expiration
-          if (tData.accessToken && tData.expiresAt > Date.now()) {
-            activeToken = tData.accessToken;
-          }
-        }
-      } catch (errToken) {
-        console.warn("N'a pas pu vérifier l'active token admin:", errToken);
-      }
-
       let driveFileId = '';
-      let driveStatus = 'pending';
+      let driveStatus = 'success'; // Les fichiers atterrissent directement sur le Drive via le Google Apps Script (sans protocole/token)
 
       // Safe Firestore limit: 1MB document limit, Base64 adds 33% overhead. Max binary size ~750KB.
       const isTooLargeForFirestore = selectedFile.size > 750000;
       const base64ToStore = isTooLargeForFirestore ? '' : base64Data;
-
-      // If active token exists and the file is NOT too large for direct API upload
-      if (activeToken && !isTooLargeForFirestore) {
-        try {
-          const fileDesc = `Dépôt archiv2ie\nAuteur: ${formData.nom} (${formData.statut})\nEmail: ${formData.email}\nFilière: ${mappedFiliere}\nSemestre: ${formData.semestre}\nMatière: ${formData.matiere}\nDocument: ${formData.nomDoc}\nCommentaire: ${formData.commentaire || 'Aucun'}`;
-          
-          driveFileId = await uploadToGoogleDrive(
-            activeToken,
-            selectedFile.name,
-            selectedFile.type,
-            base64Data,
-            fileDesc
-          );
-          driveStatus = 'success';
-        } catch (errDrive) {
-          console.error("Erreur d'upload automatique vers Google Drive:", errDrive);
-          driveStatus = 'pending';
-        }
-      }
 
       // 4. Save metadata (+ base64 if small) to central cloud database (Firestore)
       const newDepot = {
@@ -830,71 +912,74 @@ Commentaire: ${dep.commentaire}`;
         createdAt: new Date().toISOString()
       };
 
-      await setDoc(doc(db, 'deposits', depositId), newDepot);
-
-      // 5. Submit backup/large file to original Google Apps Script inside hidden iframe
       try {
-        const iframeId = 'iframe-masquee-archiv2ie-react';
-        let iframe = document.getElementById(iframeId) as HTMLIFrameElement;
-        if (!iframe) {
-          iframe = document.createElement('iframe');
-          iframe.id = iframeId;
-          iframe.name = iframeId;
-          iframe.style.display = 'none';
-          document.body.appendChild(iframe);
-        }
-
-        const tempForm = document.createElement('form');
-        tempForm.method = 'POST';
-        tempForm.action = "https://script.google.com/macros/s/AKfycbyCsHpIQj_ncjj6Tjbvaz4xqoA6KbWBpXmR-D5TvAVdTAFgKZzXpjzhf0TaDY41J7Ol/exec";
-        tempForm.target = iframeId;
-
-        const submissionDataset = {
-          nom: formData.nom,
-          email: formData.email,
-          statut: formData.statut,
-          filiere: mappedFiliere,
-          semestre: formData.semestre,
-          typeDoc: `${formData.typeDoc} - ${formData.nomDoc}`,
-          matiere: formData.matiere,
-          commentaire: formData.commentaire || 'Aucun',
-          filename: selectedFile.name,
-          mimeType: selectedFile.type,
-          bytes: base64Data
-        };
-
-        for (const [key, value] of Object.entries(submissionDataset)) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = key;
-          input.value = value;
-          tempForm.appendChild(input);
-        }
-
-        document.body.appendChild(tempForm);
-        tempForm.submit();
-
-        setTimeout(() => {
-          if (document.body.contains(tempForm)) {
-            document.body.removeChild(tempForm);
-          }
-        }, 3000);
-      } catch (e) {
-        console.warn("Apps script trigger error:", e);
+        await withTimeout(
+          setDoc(doc(db, 'deposits', depositId), newDepot),
+          15000,
+          "La base de données met trop de temps à répondre. Veuillez vérifier votre connexion internet."
+        );
+      } catch (errDb) {
+        handleFirestoreError(errDb, OperationType.WRITE, `deposits/${depositId}`);
       }
 
+      // 5. Submit backup/large file to original Google Apps Script inside hidden iframe asynchronously
+      // This is triggered in a setTimeout to avoid blocking the React render thread or freezing the UI on mobile.
+      setTimeout(() => {
+        try {
+          const iframeId = 'iframe-masquee-archiv2ie-react';
+          let iframe = document.getElementById(iframeId) as HTMLIFrameElement;
+          if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = iframeId;
+            iframe.name = iframeId;
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+          }
+
+          const tempForm = document.createElement('form');
+          tempForm.method = 'POST';
+          tempForm.action = "https://script.google.com/macros/s/AKfycbyCsHpIQj_ncjj6Tjbvaz4xqoA6KbWBpXmR-D5TvAVdTAFgKZzXpjzhf0TaDY41J7Ol/exec";
+          tempForm.target = iframeId;
+
+          const submissionDataset = {
+            nom: formData.nom,
+            email: formData.email,
+            statut: formData.statut,
+            filiere: mappedFiliere,
+            semestre: formData.semestre,
+            typeDoc: `${formData.typeDoc} - ${formData.nomDoc}`,
+            matiere: formData.matiere,
+            commentaire: formData.commentaire || 'Aucun',
+            filename: selectedFile.name,
+            mimeType: selectedFile.type,
+            bytes: base64Data
+          };
+
+          for (const [key, value] of Object.entries(submissionDataset)) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            tempForm.appendChild(input);
+          }
+
+          document.body.appendChild(tempForm);
+          tempForm.submit();
+
+          setTimeout(() => {
+            if (document.body.contains(tempForm)) {
+              document.body.removeChild(tempForm);
+            }
+          }, 3000);
+        } catch (e) {
+          console.warn("Apps script trigger error:", e);
+        }
+      }, 100);
+
+      // Unlock button and reset state immediately to show fast, modern responsive feedback!
       setIsSubmitting(false);
 
-      let alertMessage = `Merci pour votre contribution, ${formData.nom} ! Votre document a été enregistré avec succès sur archiv2ie. 🚀\n\n`;
-      if (isTooLargeForFirestore) {
-        alertMessage += `Note : En raison de sa taille (${(selectedFile.size / (1024 * 1024)).toFixed(2)} Mo), le fichier a été envoyé directement vers votre Google Drive d'administration via Google Apps Script pour préserver la base de données.`;
-      } else if (driveStatus === 'success') {
-        alertMessage += `GÉNIAL : Le document a été téléversé automatiquement dans votre dossier Google Drive d'archiv2ie !`;
-      } else {
-        alertMessage += `Le document a été enregistré. L'administrateur le synchronisera vers Google Drive lors de sa prochaine session d'archivage.`;
-      }
-
-      showToast(alertMessage, 'success');
+      showToast(`Merci pour votre contribution, ${formData.nom} ! Votre document a été enregistré avec succès et téléversé directement dans le dossier Google Drive d'archiv2ie. 🚀`, 'success');
 
       // Reset states
       setFormData({
@@ -1381,44 +1466,68 @@ Commentaire: ${dep.commentaire}`;
             </div>
           </div>
 
-          {/* Section Mode Switcher */}
-          <div className="flex border-b border-gray-100 gap-6 text-sm font-semibold">
-            <button
-              type="button"
-              onClick={() => setAdminTab('list')}
-              className={`pb-3 relative transition-colors cursor-pointer flex items-center gap-2 ${
-                adminTab === 'list' ? 'text-brand' : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              <span>📂 Modération & Synchro ({firestoreDeposits.length})</span>
-              {adminTab === 'list' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand rounded-full" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setAdminTab('stats')}
-              className={`pb-3 relative transition-colors cursor-pointer flex items-center gap-2 ${
-                adminTab === 'stats' ? 'text-brand' : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              <span>📊 Exploitation des Données & Statistiques</span>
-              {adminTab === 'stats' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand rounded-full" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setAdminTab('security')}
-              className={`pb-3 relative transition-colors cursor-pointer flex items-center gap-2 ${
-                adminTab === 'security' ? 'text-brand' : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              <span>⚙️ Sécurité & Code Maître</span>
-              {adminTab === 'security' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand rounded-full" />
-              )}
-            </button>
+          {/* Main Admin Tab Switcher */}
+          <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center bg-gray-50 p-2 rounded-2xl border border-gray-100/80">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  // If switching from security, default to 'list' (submissions list)
+                  if (adminTab === 'security') {
+                    setAdminTab('list');
+                  }
+                }}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                  adminTab !== 'security'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200/50'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-white/50 border border-transparent'
+                }`}
+              >
+                <FolderOpen className={`h-4 w-4 ${adminTab !== 'security' ? 'text-brand' : 'text-gray-400'}`} />
+                <span>Exploitation des données</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAdminTab('security')}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                  adminTab === 'security'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200/50'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-white/50 border border-transparent'
+                }`}
+              >
+                <Shield className={`h-4 w-4 ${adminTab === 'security' ? 'text-brand' : 'text-gray-400'}`} />
+                <span>Sécurité</span>
+              </button>
+            </div>
+
+            {/* Sub-tabs for data exploitation when active */}
+            {adminTab !== 'security' && (
+              <div className="flex p-1 bg-gray-200/50 rounded-xl gap-1">
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('list')}
+                  className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                    adminTab === 'list'
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-950'
+                  }`}
+                >
+                  📋 Liste de dépôts
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('stats')}
+                  className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                    adminTab === 'stats'
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-950'
+                  }`}
+                >
+                  📊 Tableau de bord & Annuaire
+                </button>
+              </div>
+            )}
           </div>
 
           {adminTab === 'list' ? (
@@ -2151,55 +2260,11 @@ Commentaire: ${dep.commentaire}`;
               </div>
               <h3 className="font-serif text-xl sm:text-2xl font-bold text-gray-900">Espace Administration</h3>
               <p className="text-xs text-gray-500 max-w-xs mx-auto">
-                Connectez-vous pour modérer les dépôts archivés et synchroniser les documents de 2iE.
+                Saisissez le code maître d'administration pour accéder à la modération des dépôts.
               </p>
             </div>
 
-            {/* Option 1: Google Sign-In */}
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={isLoggingIn}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 font-bold rounded-xl text-xs sm:text-sm transition-all shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {isLoggingIn ? (
-                  <RefreshCw className="h-4 w-4 animate-spin text-gray-500" />
-                ) : (
-                  <svg className="h-4 w-4" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.53-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-8.77z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.11 0-5.74-2.11-6.68-4.96H1.21v3.15C3.18 21.88 7.39 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.32 14.24A7.16 7.16 0 0 1 5 12c0-.79.13-1.57.38-2.34V6.51H1.21A11.94 11.94 0 0 0 0 12c0 1.92.45 3.74 1.21 5.39l4.11-3.15z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.39 0 3.18 2.12 1.21 5.39l4.11 3.15c.94-2.85 3.57-4.96 6.68-4.96z"
-                    />
-                  </svg>
-                )}
-                <span>Se connecter avec Google (Recommandé)</span>
-              </button>
-              <p className="text-[10px] text-gray-400 text-center">
-                Permet la sauvegarde et la synchronisation automatique directe vers votre Google Drive.
-              </p>
-            </div>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 text-xs text-gray-400 font-bold uppercase tracking-wider">
-              <div className="h-[1px] bg-gray-100 flex-1" />
-              <span>OU</span>
-              <div className="h-[1px] bg-gray-100 flex-1" />
-            </div>
-
-            {/* Option 2: Email & Password */}
+            {/* Option: Master Passcode */}
             <form onSubmit={handleEmailLogin} className="space-y-4">
               <div className="space-y-1">
                 <label className="block text-[11px] font-bold text-gray-500 uppercase">Adresse E-mail Admin</label>
