@@ -60,7 +60,7 @@ console.log("[Firebase Init] Active Configuration:", {
 const app = initializeApp(activeConfig);
 const auth = getAuth(app);
 
-const dbId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || (isProjectOverridden ? '' : firebaseConfig.firestoreDatabaseId);
+const dbId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || (isProjectOverridden ? '' : (firebaseConfig as any).firestoreDatabaseId);
 const db = dbId ? getFirestore(app, dbId) : getFirestore(app);
 
 const provider = new GoogleAuthProvider();

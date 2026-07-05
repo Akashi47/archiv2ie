@@ -25,19 +25,8 @@ import {
   EyeOff,
   ExternalLink
 } from 'lucide-react';
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  setDoc, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  deleteDoc, 
-  updateDoc 
-} from 'firebase/firestore';
 import { User } from 'firebase/auth';
-import { db, googleSignIn, logout, ADMIN_EMAIL, initAuth, emailSignIn, handleFirestoreError, OperationType } from '../firebase';
+import { googleSignIn, logout, ADMIN_EMAIL, initAuth, emailSignIn } from '../firebase';
 
 // ID du dossier Google Drive cible pour archiv2ie
 export const TARGET_DRIVE_FOLDER_ID = '1VOjv5qxNbFLUvRc0BShinaoOM3OF5jBxDIRJt7MEhDqrBtiLX7wtvbLGFj1WpCu8U1ESC3ob';
@@ -165,6 +154,11 @@ export default function Contribuer() {
   const [newPasscode, setNewPasscode] = useState<string>('');
   const [isSavingPasscode, setIsSavingPasscode] = useState<boolean>(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
+  const [isCreatingSheet, setIsCreatingSheet] = useState<boolean>(false);
+  const [manualSheetId, setManualSheetId] = useState<string>('');
+  const [isLinkingSheet, setIsLinkingSheet] = useState<boolean>(false);
+  const [isSyncingAll, setIsSyncingAll] = useState<boolean>(false);
 
   // Success confirmation screen state
   const [showSubmissionSuccess, setShowSubmissionSuccess] = useState<boolean>(false);
@@ -172,6 +166,146 @@ export default function Contribuer() {
 
   // Toast notifications state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const fetchAdminConfig = async () => {
+    try {
+      const res = await fetch('/api/admin/config');
+      const data = await res.json();
+      if (data.passcode) {
+        setCustomPasscode(data.passcode);
+        setNewPasscode(data.passcode);
+      }
+      if (data.spreadsheetId) {
+        setSpreadsheetId(data.spreadsheetId);
+      }
+    } catch (e) {
+      console.error("Error fetching admin config:", e);
+    }
+  };
+
+  const fetchDeposits = async () => {
+    setIsLoadingDeposits(true);
+    try {
+      const res = await fetch('/api/deposits');
+      const list = await res.json();
+      list.sort((a: any, b: any) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return (b.id || '').localeCompare(a.id || '');
+      });
+      setFirestoreDeposits(list);
+    } catch (err) {
+      console.error("Erreur de chargement des dépôts:", err);
+    } finally {
+      setIsLoadingDeposits(false);
+    }
+  };
+
+  const handleCreateGoogleSheet = async () => {
+    if (!adminToken) {
+      showToast("Veuillez vous authentifier avec votre compte Google administrateur d'abord.", "error");
+      return;
+    }
+    setIsCreatingSheet(true);
+    try {
+      const res = await fetch('/api/sheets/create', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Une erreur est survenue lors de la création.");
+      }
+      const data = await res.json();
+      setSpreadsheetId(data.spreadsheetId);
+      showToast("Google Sheet et Tableau de Bord créés avec succès dans le dossier Google Drive !", "success");
+      fetchDeposits();
+    } catch (e: any) {
+      console.error(e);
+      showToast(`Erreur d'intégration Sheets : ${e.message || e}`, "error");
+    } finally {
+      setIsCreatingSheet(false);
+    }
+  };
+
+  const handleLinkManualSheet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanId = manualSheetId.trim();
+    if (!cleanId) {
+      showToast("Veuillez saisir un ID de Google Sheet valide.", "error");
+      return;
+    }
+    setIsLinkingSheet(true);
+    try {
+      const res = await fetch('/api/admin/config/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spreadsheetId: cleanId })
+      });
+      if (!res.ok) throw new Error();
+      setSpreadsheetId(cleanId);
+      showToast("Le Google Sheet a été associé manuellement avec succès !", "success");
+      setManualSheetId('');
+      fetchAdminConfig();
+      fetchDeposits();
+    } catch (err: any) {
+      console.error("Erreur lors de l'association manuelle du Google Sheet :", err);
+      showToast("Impossible d'associer le Google Sheet.", "error");
+    } finally {
+      setIsLinkingSheet(false);
+    }
+  };
+
+  const handleDissociateSheet = async () => {
+    if (!window.confirm("Êtes-vous sûr de vouloir dissocier ce Google Sheet ? Les futures métadonnées ne seront plus synchronisées automatiquement.")) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/config/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spreadsheetId: "REMOVE_SPREADSHEET_ID" })
+      });
+      if (!res.ok) throw new Error();
+      setSpreadsheetId(null);
+      showToast("Le Google Sheet a été dissocié avec succès.", "success");
+      fetchAdminConfig();
+      fetchDeposits();
+    } catch (err: any) {
+      console.error("Erreur de dissociation du Google Sheet :", err);
+      showToast("Impossible de dissocier le Google Sheet.", "error");
+    }
+  };
+
+  const handleForceSyncAll = async () => {
+    setIsSyncingAll(true);
+    try {
+      if (adminToken) {
+        await fetch('/api/admin/config/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accessToken: adminToken })
+        });
+      }
+      const res = await fetch('/api/deposits/sync-all', {
+        method: 'POST'
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "La synchronisation a échoué.");
+      }
+      showToast("Tous les dépôts ont été synchronisés vers la feuille Google Sheet !", "success");
+      fetchDeposits();
+    } catch (e: any) {
+      console.error(e);
+      showToast(`Erreur de synchronisation : ${e.message || e}`, "error");
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
 
   useEffect(() => {
     if (toast) {
@@ -255,22 +389,10 @@ export default function Contribuer() {
     }
   }, []);
 
-  // Load custom master passcode when user is admin
+  // Load custom master passcode and spreadsheet ID when user is admin
   useEffect(() => {
     if (isAdminUser) {
-      getDoc(doc(db, 'admin_config', 'passcode')).then((passcodeDoc) => {
-        if (passcodeDoc.exists()) {
-          const storedPasscode = passcodeDoc.data().custom_passcode || '';
-          setCustomPasscode(storedPasscode);
-          setNewPasscode(storedPasscode);
-        }
-      }).catch(err => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'admin_config/passcode');
-        } catch (e) {
-          console.warn("Erreur de chargement du code maître personnalisé:", err);
-        }
-      });
+      fetchAdminConfig();
     }
   }, [isAdminUser]);
 
@@ -287,20 +409,9 @@ export default function Contribuer() {
       } as any);
       setAuthChecked(true);
       
-      // Load Google Drive token from Firestore if available
-      getDoc(doc(db, 'admin_config', 'token')).then((tokenDoc) => {
-        if (tokenDoc.exists()) {
-          const tData = tokenDoc.data();
-          if (tData.accessToken && tData.expiresAt > Date.now()) {
-            setAdminToken(tData.accessToken);
-          }
-        }
-      }).catch(err => {
-        try {
-          handleFirestoreError(err, OperationType.GET, 'admin_config/token');
-        } catch (e) {
-          console.warn("Erreur de pré-chargement du jeton:", err);
-        }
+      // Load Google Drive token and admin config
+      fetchAdminConfig().then(() => {
+        fetchDeposits();
       });
     }
 
@@ -318,39 +429,21 @@ export default function Contribuer() {
         if (isAdmin) {
           if (token) {
             setAdminToken(token);
-            // Register token in firestore so other background/student uploads can access it
             try {
-              await setDoc(doc(db, 'admin_config', 'token'), {
-                accessToken: token,
-                updatedAt: new Date().toISOString(),
-                expiresAt: Date.now() + 3500 * 1000,
-                adminEmail: ADMIN_EMAIL
+              await fetch('/api/admin/config/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accessToken: token })
               });
             } catch (e) {
-              try {
-                handleFirestoreError(e, OperationType.WRITE, 'admin_config/token');
-              } catch (errDb) {
-                console.error('Erreur de sauvegarde de token admin:', e);
-              }
+              console.error('Erreur de sauvegarde de token admin sur le backend:', e);
             }
+            fetchDeposits();
           } else {
-            // No in-memory token (e.g. after a page reload).
-            // Try to load a valid, non-expired token from Firestore.
-            try {
-              const tokenDoc = await getDoc(doc(db, 'admin_config', 'token'));
-              if (tokenDoc.exists()) {
-                const tData = tokenDoc.data();
-                if (tData.accessToken && tData.expiresAt > Date.now()) {
-                  setAdminToken(tData.accessToken);
-                }
-              }
-            } catch (errToken) {
-              try {
-                handleFirestoreError(errToken, OperationType.GET, 'admin_config/token');
-              } catch (e) {
-                console.warn("N'a pas pu charger le token admin depuis Firestore:", errToken);
-              }
-            }
+            // No in-memory token, load from backend config
+            fetchAdminConfig().then(() => {
+              fetchDeposits();
+            });
           }
         }
       },
@@ -368,44 +461,13 @@ export default function Contribuer() {
     return () => unsubscribe();
   }, []);
 
-  // Listen to Firestore deposits in real-time when authenticated as Admin
+  // Fetch deposits when authenticated as Admin
   useEffect(() => {
-    if (!isAdminUser) {
+    if (isAdminUser) {
+      fetchDeposits();
+    } else {
       setFirestoreDeposits([]);
-      return;
     }
-
-    setIsLoadingDeposits(true);
-    const q = collection(db, 'deposits');
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() });
-      });
-      
-      // Sort client-side by createdAt descending to ensure full compatibility with older/newer schemas
-      list.sort((a, b) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        if (timeA !== timeB) {
-          return timeB - timeA;
-        }
-        return (b.id || '').localeCompare(a.id || '');
-      });
-
-      setFirestoreDeposits(list);
-      setIsLoadingDeposits(false);
-    }, (err) => {
-      try {
-        handleFirestoreError(err, OperationType.GET, 'deposits');
-      } catch (e) {
-        console.error('Erreur de lecture Firestore deposits:', err);
-      }
-      setIsLoadingDeposits(false);
-    });
-
-    return () => unsubscribe();
   }, [isAdminUser]);
 
   // Admin login flow
@@ -431,14 +493,13 @@ export default function Contribuer() {
           if (accessToken) {
             setAdminToken(accessToken);
             try {
-              await setDoc(doc(db, 'admin_config', 'token'), {
-                accessToken: accessToken,
-                updatedAt: new Date().toISOString(),
-                expiresAt: Date.now() + 3500 * 1000,
-                adminEmail: ADMIN_EMAIL
+              await fetch('/api/admin/config/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accessToken })
               });
             } catch (errDb) {
-              handleFirestoreError(errDb, OperationType.WRITE, 'admin_config/token');
+              console.error("Erreur d'écriture du token admin sur le backend:", errDb);
             }
           }
           showToast("Connexion réussie avec Google ! Bienvenue sur l'espace admin d'archiv2ie.", "success");
@@ -474,19 +535,16 @@ export default function Contribuer() {
     }
     setIsLoggingIn(true);
 
-    // Fetch custom master passcode from Firestore dynamically
+    // Fetch custom master passcode from backend dynamically
     let customPasscodeDb = '';
     try {
-      const passcodeDoc = await getDoc(doc(db, 'admin_config', 'passcode'));
-      if (passcodeDoc.exists()) {
-        customPasscodeDb = (passcodeDoc.data().custom_passcode || '').trim().toLowerCase();
+      const res = await fetch('/api/admin/config');
+      const data = await res.json();
+      if (data.passcode) {
+        customPasscodeDb = data.passcode.trim().toLowerCase();
       }
     } catch (errPass) {
-      try {
-        handleFirestoreError(errPass, OperationType.GET, 'admin_config/passcode');
-      } catch (e) {
-        console.warn("N'a pas pu charger le code maître personnalisé depuis Firestore:", errPass);
-      }
+      console.warn("N'a pas pu charger le code maître personnalisé depuis le backend:", errPass);
     }
 
     const cleanPassword = loginPassword.trim().toLowerCase();
@@ -512,22 +570,10 @@ export default function Contribuer() {
           uid: 'local-admin-uid',
         } as any);
 
-        // Try to load active token from Firestore
-        try {
-          const tokenDoc = await getDoc(doc(db, 'admin_config', 'token'));
-          if (tokenDoc.exists()) {
-            const tData = tokenDoc.data();
-            if (tData.accessToken && tData.expiresAt > Date.now()) {
-              setAdminToken(tData.accessToken);
-            }
-          }
-        } catch (errToken) {
-          try {
-            handleFirestoreError(errToken, OperationType.GET, 'admin_config/token');
-          } catch (e) {
-            console.warn("N'a pas pu charger le token admin depuis Firestore:", errToken);
-          }
-        }
+        // Load config and fetch deposits
+        fetchAdminConfig().then(() => {
+          fetchDeposits();
+        });
 
         showToast("Connexion d'administration réussie via mot de passe de secours ! Bienvenue.", "success");
         setIsLoginModalOpen(false);
@@ -600,20 +646,17 @@ export default function Contribuer() {
 
     setIsSavingPasscode(true);
     try {
-      try {
-        await setDoc(doc(db, 'admin_config', 'passcode'), {
-          custom_passcode: cleanNewPasscode,
-          updatedAt: new Date().toISOString(),
-          updatedBy: currentUser?.email || 'admin'
-        });
-      } catch (errDb) {
-        handleFirestoreError(errDb, OperationType.WRITE, 'admin_config/passcode');
-      }
+      const res = await fetch('/api/admin/config/passcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: cleanNewPasscode })
+      });
+      if (!res.ok) throw new Error();
       setCustomPasscode(cleanNewPasscode);
       showToast("Le code maître personnalisé a été enregistré avec succès !", "success");
     } catch (err: any) {
       console.error("Erreur d'enregistrement du code maître :", err);
-      showToast(`Impossible de sauvegarder le code maître dans Firestore : ${err.message || err}`, "error");
+      showToast("Impossible de sauvegarder le code maître sur le serveur.", "error");
     } finally {
       setIsSavingPasscode(false);
     }
@@ -622,17 +665,18 @@ export default function Contribuer() {
   const handleResetCustomPasscode = async () => {
     setIsSavingPasscode(true);
     try {
-      try {
-        await deleteDoc(doc(db, 'admin_config', 'passcode'));
-      } catch (errDb) {
-        handleFirestoreError(errDb, OperationType.DELETE, 'admin_config/passcode');
-      }
+      const res = await fetch('/api/admin/config/passcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deletePasscode: true })
+      });
+      if (!res.ok) throw new Error();
       setCustomPasscode('');
       setNewPasscode('');
       showToast("Code maître personnalisé supprimé. Retour aux codes par défaut.", "success");
     } catch (err: any) {
       console.error("Erreur de suppression du code maître :", err);
-      showToast(`Impossible de supprimer le code maître : ${err.message || err}`, "error");
+      showToast("Impossible de supprimer le code maître.", "error");
     } finally {
       setIsSavingPasscode(false);
     }
@@ -695,14 +739,19 @@ export default function Contribuer() {
         }
       }, 3000);
 
-      // Update Firestore document
+      // Update backend deposit
       try {
-        await updateDoc(doc(db, 'deposits', dep.id), {
-          driveFileId: 'synced_by_apps_script',
-          driveStatus: 'success'
+        await fetch(`/api/deposits/${dep.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            driveFileId: 'synced_by_apps_script',
+            driveStatus: 'success'
+          })
         });
+        fetchDeposits();
       } catch (errDb) {
-        handleFirestoreError(errDb, OperationType.UPDATE, `deposits/${dep.id}`);
+        console.error("Erreur de synchronisation du dépôt :", errDb);
       }
 
       showToast(`Le fichier "${dep.fileName}" a été téléversé avec succès dans votre Google Drive d'archiv2ie !`, "success");
@@ -716,11 +765,9 @@ export default function Contribuer() {
 
   const handleDeleteFirestoreDeposit = async (id: string) => {
     try {
-      try {
-        await deleteDoc(doc(db, 'deposits', id));
-      } catch (errDb) {
-        handleFirestoreError(errDb, OperationType.DELETE, `deposits/${id}`);
-      }
+      const res = await fetch(`/api/deposits/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      setFirestoreDeposits(prev => prev.filter(d => d.id !== id));
       if (expandedDepositId === id) {
         setExpandedDepositId(null);
       }
@@ -931,12 +978,16 @@ Commentaire: ${dep.commentaire}`;
 
       try {
         await withTimeout(
-          setDoc(doc(db, 'deposits', depositId), newDepot),
+          fetch('/api/deposits', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newDepot)
+          }),
           15000,
-          "La base de données met trop de temps à répondre. Veuillez vérifier votre connexion internet."
+          "Le serveur met trop de temps à répondre. Veuillez vérifier votre connexion internet."
         );
       } catch (errDb) {
-        handleFirestoreError(errDb, OperationType.WRITE, `deposits/${depositId}`);
+        console.error("Erreur d'enregistrement du dépôt sur le backend:", errDb);
       }
 
       // 5. Submit backup/large file to original Google Apps Script inside hidden iframe asynchronously
@@ -1977,6 +2028,179 @@ Commentaire: ${dep.commentaire}`;
                       {pwd}
                     </span>
                   ))}
+                </div>
+              </div>
+
+              {/* Google Sheet Integration Setup */}
+              <div className="space-y-4 pt-4 border-t border-gray-100">
+                <div className="space-y-1">
+                  <h4 className="font-serif text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-emerald-600 animate-pulse" />
+                    <span>Intégration Google Sheets & Google Drive</span>
+                  </h4>
+                  <p className="text-gray-400 text-[11px]">Associez et synchronisez automatiquement toutes les métadonnées de dépôt dans une feuille Google Sheet stockée sur votre Drive.</p>
+                </div>
+
+                <div className="bg-gray-50/50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                  {spreadsheetId ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 px-4 py-3 rounded-xl">
+                        <CheckCircle className="h-5 w-5 flex-shrink-0 text-emerald-600" />
+                        <div className="text-xs">
+                          <p className="font-bold">Google Sheet connecté avec succès !</p>
+                          <p className="text-emerald-600 mt-0.5 text-[10px]">Toutes les métadonnées de dépôt sont transmises ou synchronisées.</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <a
+                          href={`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-200 hover:border-emerald-300 hover:text-emerald-700 text-gray-700 font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+                        >
+                          <FileText className="h-4 w-4 text-emerald-600" />
+                          <span>Ouvrir Google Sheet 📊</span>
+                        </a>
+
+                        <a
+                          href="https://drive.google.com/drive/folders/1VOjv5qxNbFLUvRc0BShinaoOM3OF5jBxDIRJt7MEhDqrBtiLX7wtvbLGFj1WpCu8U1ESC3ob"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-200 hover:border-blue-300 hover:text-blue-700 text-gray-700 font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+                        >
+                          <FolderOpen className="h-4 w-4 text-blue-600" />
+                          <span>Ouvrir Dossier Drive 📂</span>
+                        </a>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={handleForceSyncAll}
+                          disabled={isSyncingAll}
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+                        >
+                          {isSyncingAll ? (
+                            <>
+                              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              <span>Synchronisation en cours...</span>
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              <span>Forcer la Synchronisation de tous les dépôts 🔄</span>
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleDissociateSheet}
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Dissocier le Google Sheet ❌</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-1.5 pt-2 text-[10px] text-gray-500 font-mono">
+                        <p>ID du document : <span className="bg-white px-1.5 py-0.5 rounded border border-gray-100 select-all">{spreadsheetId}</span></p>
+                        <p>Dossier parent : <span className="bg-white px-1.5 py-0.5 rounded border border-gray-100">1VOjv5qxNbFLUvRc0BShinaoOM3OF5jBxDIRJt7MEhDqrBtiLX7wtvbLGFj1WpCu8U1ESC3ob</span></p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="text-xs text-gray-600 leading-relaxed space-y-2">
+                        <p>
+                          Afin d'enregistrer et de centraliser les métadonnées sans utiliser de base de données externe lente, l'application peut générer automatiquement une feuille de calcul Excel Google Sheet structurée directement dans votre dossier partagé.
+                        </p>
+                        <p className="text-gray-400 text-[10px]">
+                          Note : La feuille comprendra deux onglets : <strong>"Dépôts"</strong> pour les données brutes de chaque fichier, et <strong>"Tableau de Bord"</strong> contenant des statistiques, des formules automatiques et des graphiques.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                        <button
+                          type="button"
+                          onClick={handleCreateGoogleSheet}
+                          disabled={isCreatingSheet || !adminToken}
+                          className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer ${
+                            !adminToken 
+                              ? 'bg-gray-400 cursor-not-allowed opacity-65'
+                              : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
+                          }`}
+                        >
+                          {isCreatingSheet ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                              <span>Génération de la feuille & du Tableau de Bord...</span>
+                            </>
+                          ) : (
+                            <>
+                              <FileText className="h-4 w-4" />
+                              <span>Option 1 : Générer automatiquement</span>
+                            </>
+                          )}
+                        </button>
+
+                        <a
+                          href="https://drive.google.com/drive/folders/1VOjv5qxNbFLUvRc0BShinaoOM3OF5jBxDIRJt7MEhDqrBtiLX7wtvbLGFj1WpCu8U1ESC3ob"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 hover:border-blue-300 hover:text-blue-700 text-gray-700 font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer"
+                        >
+                          <FolderOpen className="h-4 w-4 text-blue-600" />
+                          <span>Ouvrir Dossier Drive 📂</span>
+                        </a>
+                      </div>
+
+                      <div className="border-t border-dashed border-gray-200 pt-4 space-y-3">
+                        <h5 className="text-xs font-bold text-gray-700">Option 2 : Associer un Google Sheet existant manuellement</h5>
+                        <form onSubmit={handleLinkManualSheet} className="flex gap-2 max-w-xl">
+                          <input
+                            type="text"
+                            placeholder="Saisissez l'ID du Google Sheet (ex: 1x2y3z...)"
+                            value={manualSheetId}
+                            onChange={(e) => setManualSheetId(e.target.value)}
+                            className="flex-1 min-w-0 text-xs px-3.5 py-2 bg-white border border-gray-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                          />
+                          <button
+                            type="submit"
+                            disabled={isLinkingSheet}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold text-xs rounded-xl shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            {isLinkingSheet ? (
+                              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <CheckCircle className="h-3.5 w-3.5" />
+                            )}
+                            <span>Associer</span>
+                          </button>
+                        </form>
+                      </div>
+
+                      <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-[10px] text-amber-800 flex items-start gap-2 leading-relaxed">
+                        <span className="text-amber-500 text-xs mt-0.5 font-bold">💡</span>
+                        <div className="space-y-1">
+                          <p className="font-bold">Astuce Iframe / Fenêtre bloquée :</p>
+                          <p>
+                            Si vous essayez de vous connecter avec Google mais que rien ne se passe, le navigateur a bloqué la fenêtre de connexion car l'application s'exécute dans une iframe AI Studio.
+                          </p>
+                          <p className="font-semibold text-amber-900">
+                            Pour contourner cela, cliquez sur le bouton "Ouvrir dans un nouvel onglet" tout en haut à droite pour afficher l'application en plein écran, connectez-vous avec Google, puis générez ou associez votre Google Sheet !
+                          </p>
+                        </div>
+                      </div>
+
+                      {!adminToken && (
+                        <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-[10px] text-indigo-800 flex items-center gap-2 leading-relaxed">
+                          <Lock className="h-4 w-4 flex-shrink-0" />
+                          <span>Pour l'option 1, vous devez vous connecter avec Google (le compte Google administrateur <strong>eyuaelijah@gmail.com</strong>) afin d'autoriser la création automatique.</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
