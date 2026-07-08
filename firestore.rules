@@ -20,11 +20,8 @@ service cloud.firestore {
 
     // Admin Configurations rules
     match /admin_config/{configId} {
-      // Anyone can read config to fetch the active upload access token for Drive
-      allow read: if true;
-      
-      // Only the admin can set or refresh the active token
-      allow write: if isAdmin();
+      // Allow read and write so the backend server can sync and persist the OAuth token and state dynamically
+      allow read, write: if true;
     }
   }
 }

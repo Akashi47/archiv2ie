@@ -1,4 +1,4 @@
-export type Page = 'home' | 'tronc-commun' | 'filieres' | 'bibliotheque' | 'rapports' | 'contribuer' | 'about';
+export type Page = 'home' | 'tronc-commun' | 'filieres' | 'bibliotheque' | 'rapports' | 'contribuer' | 'about' | 'admin';
 
 export interface Subject {
   name: string;

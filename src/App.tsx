@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Page, FiliereKey } from './types';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -9,11 +9,19 @@ import Bibliotheque from './components/Bibliotheque';
 import Rapports from './components/Rapports';
 import Contribuer from './components/Contribuer';
 import About from './components/About';
+import Admin from './components/Admin';
 import { AnimatePresence, motion } from 'motion/react';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [selectedFiliere, setSelectedFiliere] = useState<FiliereKey>('gee');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('page') === 'admin' || params.get('admin') === 'true') {
+      setCurrentPage('admin');
+    }
+  }, []);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -38,9 +46,11 @@ export default function App() {
       case 'rapports':
         return <Rapports />;
       case 'contribuer':
-        return <Contribuer />;
+        return <Contribuer setCurrentPage={setCurrentPage} />;
       case 'about':
         return <About />;
+      case 'admin':
+        return <Admin setCurrentPage={setCurrentPage} />;
       default:
         return <Home setCurrentPage={setCurrentPage} setSelectedFiliere={setSelectedFiliere} />;
     }
