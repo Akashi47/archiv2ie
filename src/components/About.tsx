@@ -39,9 +39,9 @@ export default function About() {
 
         {/* Contact & Support */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-          <h3 className="font-serif text-xl font-bold text-gray-900">📞 Contact & Support</h3>
+          <h3 className="font-serif text-xl font-bold text-gray-900">📞 Contact & support</h3>
           <p className="text-xs text-gray-500 leading-relaxed">
-            Une remarque ? Un lien mort ? Un dossier Drive qui nécessite une restructuration ? Contactez les représentants du Club de Génie Civil, de l'eau, de l'énergie ou les délégués d'étudiants de vos filières respectives pour soumettre vos suggestions d'améliorations techniques et documentaires.
+            Une remarque ? Un lien mort ? Un dossier Drive qui nécessite une restructuration ? Contactez votre délégué pour soumettre vos suggestions d'améliorations techniques et documentaires.
           </p>
         </div>
 

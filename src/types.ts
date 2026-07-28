@@ -1,4 +1,4 @@
-export type Page = 'home' | 'tronc-commun' | 'filieres' | 'bibliotheque' | 'rapports' | 'contribuer' | 'about' | 'admin';
+export type Page = 'home' | 'tronc-commun' | 'filieres' | 'bibliotheque' | 'rapports' | 'contribuer' | 'about';
 
 export interface Subject {
   name: string;
@@ -54,4 +54,16 @@ export interface ContributionData {
   commentaire: string;
   fileName?: string;
   fileData?: string; // base64
+}
+
+export interface RecentDocument {
+  id: string;
+  title: string;
+  filiere: string;
+  type: 'Cours' | 'Annales' | 'Bibliothèque' | 'Rapport' | 'Projet';
+  description: string;
+  driveKey: string;
+  dateAdded: string;
+  badgeClass: string;
+  borderClass: string;
 }

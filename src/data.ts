@@ -1,4 +1,4 @@
-import { Subject, CourseCategory, FiliereData } from './types';
+import { Subject, CourseCategory, FiliereData, RecentDocument } from './types';
 
 export const driveLinks: Record<string, string> = {
   "maths": "https://drive.google.com/drive/folders/1bzCJFDkE8TgHboS7j_Fb9V8hQPs7sbG6?usp=drive_link",
@@ -287,5 +287,41 @@ export const filieresData: FiliereData[] = [
         subjects: ["Réseaux d'irrigation sous pression", "Calcul de stabilité de barrage en terre", "Drainage des sols agricoles", "Aménagement des bas-fonds"]
       }
     ]
+  }
+];
+
+export const recentDocuments: RecentDocument[] = [
+  {
+    id: "doc-1",
+    title: "Cours de Béton Armé (Eurocode 2)",
+    filiere: "GC-BTP · Semestre 7",
+    type: "Cours",
+    description: "Fiches d'exercices corrigées détaillées sur le dimensionnement des poutres en béton armé aux ELU/ELS.",
+    driveKey: "gc-s7",
+    dateAdded: "Récent",
+    badgeClass: "text-gc bg-amber-50 border border-amber-200/60",
+    borderClass: "border-gc"
+  },
+  {
+    id: "doc-2",
+    title: "Dimensionnement Réseaux AEP",
+    filiere: "GEAAH · Semestre 6",
+    type: "Annales",
+    description: "Support de travaux pratiques complet sur le calcul des pertes de charge singulières et linéaires en conduite hydraulique.",
+    driveKey: "geaah-s6d",
+    dateAdded: "Récent",
+    badgeClass: "text-brand bg-emerald-50 border border-emerald-200/60",
+    borderClass: "border-brand"
+  },
+  {
+    id: "doc-3",
+    title: "Systèmes Solaires Photovoltaïques",
+    filiere: "GEE · Options S9",
+    type: "Cours",
+    description: "Guide pratique d'installation, de couplage et de configuration des onduleurs industriels connectés au réseau.",
+    driveKey: "gee-op1",
+    dateAdded: "Nouveau",
+    badgeClass: "text-gee bg-red-50 border border-red-200/60",
+    borderClass: "border-gee"
   }
 ];

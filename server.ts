@@ -41,15 +41,13 @@ const CONFIG_FILE = path.join(process.cwd(), "sheets_config.json");
 
 // Read firebase-applet-config.json for server-side persistence
 const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
-let firestoreDb: any = null;
+let firestoreDb: any = null; // Set to null to disable Firestore storage as requested
 
 if (fs.existsSync(firebaseConfigPath)) {
   try {
     const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
-    const app = initializeApp(firebaseConfig);
-    const dbId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || firebaseConfig.firestoreDatabaseId;
-    firestoreDb = dbId ? getFirestore(app, dbId) : getFirestore(app);
-    console.log("[Firebase Server] Firestore initialized successfully.");
+    initializeApp(firebaseConfig);
+    console.log("[Firebase Server] Firebase initialized (Firestore database disabled as requested).");
   } catch (e) {
     console.error("[Firebase Server] Error initializing Firebase on backend:", e);
   }
@@ -535,6 +533,211 @@ async function startServer() {
     res.status(401).json({ success: false, error: "Code d'accès incorrect." });
   });
 
+  // Helper function to create a Google Sheet inside target folder
+  async function createAndInitializeGoogleSheet(token: string): Promise<{ spreadsheetId: string, url: string }> {
+    const folderId = "19v7MeKlnODC2x3JeVpR1qmyN4_J-gjuB";
+
+    console.log("[Sheets Create Helper] Step 1: Creating Google Sheet...");
+    const response = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        properties: {
+          title: "Remix Archiv2ie - Métadonnées",
+        },
+        sheets: [
+          {
+            properties: {
+              title: "Dépôts",
+              gridProperties: {
+                frozenRowCount: 1,
+              },
+            },
+          },
+          {
+            properties: {
+              title: "Tableau de Bord",
+              gridProperties: {
+                showGridLines: true,
+              },
+            },
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Failed to create sheet: ${errText}`);
+    }
+
+    const sheetData = await response.json();
+    const spreadsheetId = sheetData.spreadsheetId;
+    const spreadsheetUrl = sheetData.spreadsheetUrl;
+    const sheets = sheetData.sheets || [];
+    const depositsSheetId = sheets[0]?.properties?.sheetId || 0;
+    const dashboardSheetId = sheets[1]?.properties?.sheetId || 0;
+
+    console.log(`[Sheets Create Helper] Sheet created: ${spreadsheetId}. Step 2: Moving Sheet to Folder...`);
+
+    // Fetch current parents
+    const metaResp = await fetch(`https://www.googleapis.com/drive/v3/files/${spreadsheetId}?fields=parents`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const meta = await metaResp.json();
+    const currentParents = meta.parents ? meta.parents.join(",") : "root";
+
+    // Move to target folder
+    const moveResp = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${folderId}&removeParents=${currentParents}`,
+      {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (!moveResp.ok) {
+      console.warn("[Sheets Create Helper] Moving to folder failed, but sheet was created. Proceeding...");
+    }
+
+    console.log("[Sheets Create Helper] Step 3: Initializing columns for Dépôts sheet...");
+    const headersUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Dépôts'!A1:P1?valueInputOption=USER_ENTERED`;
+    await fetch(headersUrl, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        values: [
+          [
+            "ID Unique",
+            "Date",
+            "Nom",
+            "Email",
+            "Statut Déposant",
+            "Filière",
+            "Semestre",
+            "Matière",
+            "Nom Document",
+            "Type Document",
+            "Commentaire",
+            "Fichier",
+            "Taille",
+            "Type MIME",
+            "Drive File ID",
+            "Statut Drive",
+          ],
+        ],
+      }),
+    });
+
+    console.log("[Sheets Create Helper] Step 4: Building Dashboard tab...");
+    const dashUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Tableau de Bord'!A1:F17?valueInputOption=USER_ENTERED`;
+    await fetch(dashUrl, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        values: [
+          ["TABLEAU DE BORD - REMIX ARCHIV2IE", "", "", "", "", ""],
+          ["Statistiques globales issues de l'application", "", "", "", "", ""],
+          ["", "", "", "", "", ""],
+          ["Métrique clé", "Valeur", "", "Dépôts par Filière", "Nombre", ""],
+          ["Total des dépôts", "=COUNTA('Dépôts'!A2:A)", "", "Tronc Commun (S1 à S4)", '=COUNTIF(\'Dépôts\'!F:F, "Tronc Commun (S1 à S4)")', ""],
+          ["Fichiers Synchronisés", '=COUNTIF(\'Dépôts\'!P2:P, "success")', "", "Génie Électrique & Énergétique (GEE)", '=COUNTIF(\'Dépôts\'!F:F, "Génie Électrique & Énergétique (GEE)")', ""],
+          ["Fichiers en attente", '=COUNTIF(\'Dépôts\'!P2:P, "pending")', "", "Génie Civil & BTP (GC-BTP)", '=COUNTIF(\'Dépôts\'!F:F, "Génie Civil & BTP (GC-BTP)")', ""],
+          ["", "", "", "Génie Eau, Assainissement & AH (GEAAH)", '=COUNTIF(\'Dépôts\'!F:F, "Génie Eau, Assainissement & AH (GEAAH)")', ""],
+          ["", "", "", "", "", ""],
+          ["Dépôts par Type de Document", "Nombre", "", "", "", ""],
+          ["Cours", '=COUNTIF(\'Dépôts\'!J:J, "Cours")', "", "", "", ""],
+          ["TD", '=COUNTIF(\'Dépôts\'!J:J, "TD")', "", "", "", ""],
+          ["TP", '=COUNTIF(\'Dépôts\'!J:J, "TP")', "", "", "", ""],
+          ["Examen", '=COUNTIF(\'Dépôts\'!J:J, "Examen")', "", "", "", ""],
+          ["Autre", '=COUNTIF(\'Dépôts\'!J:J, "Autre")', "", "", "", ""],
+        ],
+      }),
+    });
+
+    console.log("[Sheets Create Helper] Step 5: Formatting cells...");
+    const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
+    await fetch(batchUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        requests: [
+          // Style dashboard title
+          {
+            repeatCell: {
+              range: {
+                sheetId: dashboardSheetId,
+                startRowIndex: 0,
+                endRowIndex: 1,
+                startColumnIndex: 0,
+                endColumnIndex: 6,
+              },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: { red: 0.15, green: 0.23, blue: 0.35 },
+                  textFormat: { foregroundColor: { red: 1.0, green: 1.0, blue: 1.0 }, bold: true, fontSize: 14 },
+                },
+              },
+              fields: "userEnteredFormat(backgroundColor,textFormat)",
+            },
+          },
+          // Format KPI table headers
+          {
+            repeatCell: {
+              range: {
+                sheetId: dashboardSheetId,
+                startRowIndex: 3,
+                endRowIndex: 4,
+                startColumnIndex: 0,
+                endColumnIndex: 5,
+              },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: { red: 0.92, green: 0.94, blue: 0.97 },
+                  textFormat: { bold: true },
+                },
+              },
+              fields: "userEnteredFormat(backgroundColor,textFormat)",
+            },
+          },
+          // Format DocType headers
+          {
+            repeatCell: {
+              range: {
+                sheetId: dashboardSheetId,
+                startRowIndex: 9,
+                endRowIndex: 10,
+                startColumnIndex: 0,
+                endColumnIndex: 2,
+              },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: { red: 0.92, green: 0.94, blue: 0.97 },
+                  textFormat: { bold: true },
+                },
+              },
+              fields: "userEnteredFormat(backgroundColor,textFormat)",
+            },
+          },
+        ],
+      }),
+    });
+
+    return { spreadsheetId, url: spreadsheetUrl };
+  }
+
   app.post("/api/admin/config/token", async (req, res) => {
     const { accessToken, spreadsheetId } = req.body;
     if (accessToken) {
@@ -547,6 +750,20 @@ async function startServer() {
         cachedConfig.spreadsheetId = spreadsheetId;
       }
     }
+
+    // Auto-create spreadsheet if missing but we have accessToken!
+    if (cachedConfig.accessToken && !cachedConfig.spreadsheetId) {
+      try {
+        console.log("[Auto Create Sheet] Token received and spreadsheet is missing. Initiating automatic Google Sheet creation...");
+        const result = await createAndInitializeGoogleSheet(cachedConfig.accessToken);
+        cachedConfig.spreadsheetId = result.spreadsheetId;
+        cachedConfig.folderId = "19v7MeKlnODC2x3JeVpR1qmyN4_J-gjuB";
+        console.log(`[Auto Create Sheet] Automatic sheet created successfully: ${result.spreadsheetId}`);
+      } catch (err) {
+        console.error("[Auto Create Sheet] Failed to automatically create spreadsheet:", err);
+      }
+    }
+
     await persistConfig(cachedConfig);
 
     // Run background sync for any pending deposits since we have a fresh token!
@@ -568,214 +785,11 @@ async function startServer() {
     const token = authHeader.replace("Bearer ", "");
 
     try {
-      // Step 0: Find or Create "Remix Archiv2ie - Dépôts" folder dynamically in Drive
-      console.log("[Sheets Create] Step 0: Resolving Google Drive target folder...");
-      const folderId = await getOrCreateDriveFolder("Remix Archiv2ie - Dépôts", token);
-      if (!folderId) {
-        return res.status(500).json({ error: "Impossible de créer ou de localiser le dossier dans Google Drive." });
-      }
-
-      console.log("[Sheets Create] Step 1: Creating Google Sheet...");
-      const response = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          properties: {
-            title: "Remix Archiv2ie - Métadonnées",
-          },
-          sheets: [
-            {
-              properties: {
-                title: "Dépôts",
-                gridProperties: {
-                  frozenRowCount: 1,
-                },
-              },
-            },
-            {
-              properties: {
-                title: "Tableau de Bord",
-                gridProperties: {
-                  showGridLines: true,
-                },
-              },
-            },
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        return res.status(response.status).json({ error: `Failed to create sheet: ${errText}` });
-      }
-
-      const sheetData = await response.json();
-      const spreadsheetId = sheetData.spreadsheetId;
-      const spreadsheetUrl = sheetData.spreadsheetUrl;
-      const sheets = sheetData.sheets || [];
-      const depositsSheetId = sheets[0]?.properties?.sheetId || 0;
-      const dashboardSheetId = sheets[1]?.properties?.sheetId || 0;
-
-      console.log(`[Sheets Create] Sheet created: ${spreadsheetId}. Step 2: Moving Sheet to Folder...`);
-
-      // Fetch current parents
-      const metaResp = await fetch(`https://www.googleapis.com/drive/v3/files/${spreadsheetId}?fields=parents`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const meta = await metaResp.json();
-      const currentParents = meta.parents ? meta.parents.join(",") : "root";
-
-      // Move to target folder
-      const moveResp = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${folderId}&removeParents=${currentParents}`,
-        {
-          method: "PATCH",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (!moveResp.ok) {
-        console.warn("[Sheets Create] Moving to folder failed, but sheet was created. Proceeding...");
-      }
-
-      console.log("[Sheets Create] Step 3: Initializing columns for Dépôts sheet...");
-      const headersUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Dépôts'!A1:P1?valueInputOption=USER_ENTERED`;
-      await fetch(headersUrl, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          values: [
-            [
-              "ID Unique",
-              "Date",
-              "Nom",
-              "Email",
-              "Statut Déposant",
-              "Filière",
-              "Semestre",
-              "Matière",
-              "Nom Document",
-              "Type Document",
-              "Commentaire",
-              "Fichier",
-              "Taille",
-              "Type MIME",
-              "Drive File ID",
-              "Statut Drive",
-            ],
-          ],
-        }),
-      });
-
-      console.log("[Sheets Create] Step 4: Building Dashboard tab...");
-      const dashUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'Tableau de Bord'!A1:F17?valueInputOption=USER_ENTERED`;
-      await fetch(dashUrl, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          values: [
-            ["TABLEAU DE BORD - REMIX ARCHIV2IE", "", "", "", "", ""],
-            ["Statistiques globales issues de l'application", "", "", "", "", ""],
-            ["", "", "", "", "", ""],
-            ["Métrique clé", "Valeur", "", "Dépôts par Filière", "Nombre", ""],
-            ["Total des dépôts", "=COUNTA('Dépôts'!A2:A)", "", "Tronc Commun (S1 à S4)", '=COUNTIF(\'Dépôts\'!F:F, "Tronc Commun (S1 à S4)")', ""],
-            ["Fichiers Synchronisés", '=COUNTIF(\'Dépôts\'!P2:P, "success")', "", "Génie Électrique & Énergétique (GEE)", '=COUNTIF(\'Dépôts\'!F:F, "Génie Électrique & Énergétique (GEE)")', ""],
-            ["Fichiers en attente", '=COUNTIF(\'Dépôts\'!P2:P, "pending")', "", "Génie Civil & BTP (GC-BTP)", '=COUNTIF(\'Dépôts\'!F:F, "Génie Civil & BTP (GC-BTP)")', ""],
-            ["", "", "", "Génie Eau, Assainissement & AH (GEAAH)", '=COUNTIF(\'Dépôts\'!F:F, "Génie Eau, Assainissement & AH (GEAAH)")', ""],
-            ["", "", "", "", "", ""],
-            ["Dépôts par Type de Document", "Nombre", "", "", "", ""],
-            ["Cours", '=COUNTIF(\'Dépôts\'!J:J, "Cours")', "", "", "", ""],
-            ["TD", '=COUNTIF(\'Dépôts\'!J:J, "TD")', "", "", "", ""],
-            ["TP", '=COUNTIF(\'Dépôts\'!J:J, "TP")', "", "", "", ""],
-            ["Examen", '=COUNTIF(\'Dépôts\'!J:J, "Examen")', "", "", "", ""],
-            ["Autre", '=COUNTIF(\'Dépôts\'!J:J, "Autre")', "", "", "", ""],
-          ],
-        }),
-      });
-
-      console.log("[Sheets Create] Step 5: Formatting cells...");
-      const batchUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
-      await fetch(batchUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          requests: [
-            // Style dashboard title
-            {
-              repeatCell: {
-                range: {
-                  sheetId: dashboardSheetId,
-                  startRowIndex: 0,
-                  endRowIndex: 1,
-                  startColumnIndex: 0,
-                  endColumnIndex: 6,
-                },
-                cell: {
-                  userEnteredFormat: {
-                    backgroundColor: { red: 0.15, green: 0.23, blue: 0.35 },
-                    textFormat: { foregroundColor: { red: 1.0, green: 1.0, blue: 1.0 }, bold: true, fontSize: 14 },
-                  },
-                },
-                fields: "userEnteredFormat(backgroundColor,textFormat)",
-              },
-            },
-            // Format KPI table headers
-            {
-              repeatCell: {
-                range: {
-                  sheetId: dashboardSheetId,
-                  startRowIndex: 3,
-                  endRowIndex: 4,
-                  startColumnIndex: 0,
-                  endColumnIndex: 5,
-                },
-                cell: {
-                  userEnteredFormat: {
-                    backgroundColor: { red: 0.92, green: 0.94, blue: 0.97 },
-                    textFormat: { bold: true },
-                  },
-                },
-                fields: "userEnteredFormat(backgroundColor,textFormat)",
-              },
-            },
-            // Format DocType headers
-            {
-              repeatCell: {
-                range: {
-                  sheetId: dashboardSheetId,
-                  startRowIndex: 9,
-                  endRowIndex: 10,
-                  startColumnIndex: 0,
-                  endColumnIndex: 2,
-                },
-                cell: {
-                  userEnteredFormat: {
-                    backgroundColor: { red: 0.92, green: 0.94, blue: 0.97 },
-                    textFormat: { bold: true },
-                  },
-                },
-                fields: "userEnteredFormat(backgroundColor,textFormat)",
-              },
-            },
-          ],
-        }),
-      });
+      const result = await createAndInitializeGoogleSheet(token);
 
       // Save to local config and sync with Firestore
-      cachedConfig.spreadsheetId = spreadsheetId;
-      cachedConfig.folderId = folderId;
+      cachedConfig.spreadsheetId = result.spreadsheetId;
+      cachedConfig.folderId = "19v7MeKlnODC2x3JeVpR1qmyN4_J-gjuB";
       cachedConfig.accessToken = token;
       await persistConfig(cachedConfig);
 
@@ -784,7 +798,7 @@ async function startServer() {
         console.error("Auto sync after sheet creation failed:", err);
       });
 
-      return res.json({ success: true, spreadsheetId, url: spreadsheetUrl });
+      return res.json({ success: true, spreadsheetId: result.spreadsheetId, url: result.url });
     } catch (err: any) {
       console.error("Exception during sheet creation:", err);
       return res.status(500).json({ error: err.message || String(err) });
@@ -802,15 +816,16 @@ async function startServer() {
       return res.status(400).json({ error: "ID is required" });
     }
 
-    // Direct Google Drive Upload using backend admin credentials
-    if (newDep.base64 && cachedConfig.folderId && cachedConfig.accessToken) {
+    // Direct Google Drive Upload using backend admin credentials to the user-specified document folder
+    const documentFolderId = "1PG54uEpzOq4lq3ctLrnBYRTyWgNTo4HD-k3I43i7GpqS5hFlQeJ_RcS6zFs4nn0qZRuwOsHo";
+    if (newDep.base64 && cachedConfig.accessToken) {
       try {
-        console.log(`[Direct Upload] Uploading ${newDep.fileName} directly to admin's Drive...`);
+        console.log(`[Direct Upload] Uploading ${newDep.fileName} directly to admin's Drive folder ${documentFolderId}...`);
         const fileId = await uploadFileToDrive(
           newDep.nomDoc || newDep.fileName,
           newDep.fileType,
           newDep.base64,
-          cachedConfig.folderId,
+          documentFolderId,
           cachedConfig.accessToken
         );
         if (fileId) {

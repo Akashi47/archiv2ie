@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page, FiliereKey } from '../types';
-import { driveLinks } from '../data';
+import { driveLinks, recentDocuments } from '../data';
 import { BookOpen, Calendar, ArrowRight, Download, FileText, Library, HelpCircle, HardHat, Zap, Droplet, Award, ChevronRight } from 'lucide-react';
 import graduatesImg from '../assets/images/remise-diplomes-2ie.jpg';
 
@@ -106,7 +106,7 @@ export default function Home({ setCurrentPage, setSelectedFiliere }: HomeProps) 
             {/* Cours */}
             <div className="glass-effect rounded-2xl p-6 card-shadow card-hover-effect flex flex-col justify-between border border-gray-100">
               <div className="space-y-4">
-                <h3 className="font-serif text-lg font-bold text-gray-900">📚 Supports de Cours</h3>
+                <h3 className="font-serif text-lg font-bold text-gray-900">📚 Supports de cours</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">
                   Présentations de professeurs, fiches synthétiques d'étudiants, programmes officiels et syllabus mis à jour.
                 </p>
@@ -123,9 +123,9 @@ export default function Home({ setCurrentPage, setSelectedFiliere }: HomeProps) 
             {/* Annales */}
             <div className="glass-effect rounded-2xl p-6 card-shadow card-hover-effect flex flex-col justify-between border border-gray-100">
               <div className="space-y-4">
-                <h3 className="font-serif text-lg font-bold text-gray-900">📝 Annales d'Examens</h3>
+                <h3 className="font-serif text-lg font-bold text-gray-900">📝 Annales d'examens</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  Sujets de devoirs surveillés (DS), examens finaux, propositions de corrigés officiels ou rédigés par les majors de promo.
+                  Sujets de devoirs, d'examens et propositions de corrigés
                 </p>
               </div>
               <button 
@@ -140,7 +140,7 @@ export default function Home({ setCurrentPage, setSelectedFiliere }: HomeProps) 
             {/* Bibliothèque */}
             <div className="glass-effect rounded-2xl p-6 card-shadow card-hover-effect flex flex-col justify-between border border-gray-100">
               <div className="space-y-4">
-                <h3 className="font-serif text-lg font-bold text-gray-900">📖 Bibliothèque Technique</h3>
+                <h3 className="font-serif text-lg font-bold text-gray-900">📖 Bibliothèque technique</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">
                   Ouvrages de référence de l'ingénieur, guides Eurocodes, normes ISO et documentations techniques constructeurs.
                 </p>
@@ -320,73 +320,36 @@ export default function Home({ setCurrentPage, setSelectedFiliere }: HomeProps) 
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            {/* Addition 1 */}
-            <div className="bg-white p-6 rounded-2xl border-l-4 border-gc shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold text-gc bg-amber-50 px-2 py-0.5 rounded-full uppercase">
-                  GC-BTP · Semestre 7
-                </span>
-                <h3 className="font-serif text-lg font-bold text-gray-900 mt-2.5 leading-snug">
-                  Cours de Béton Armé (Eurocode 2)
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  Fiches d'exercices corrigées détaillées sur le dimensionnement des poutres en béton armé aux ELU/ELS.
-                </p>
-              </div>
-              <button 
-                onClick={() => openDriveFolder('gc-s7')}
-                className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline text-left"
+            {recentDocuments.map((doc) => (
+              <div 
+                key={doc.id}
+                className={`bg-white p-6 rounded-2xl border-l-4 ${doc.borderClass} shadow-sm hover:shadow-md transition-all flex flex-col justify-between`}
               >
-                <Download className="h-4 w-4" />
-                <span>Ouvrir le dossier Drive</span>
-              </button>
-            </div>
-
-            {/* Addition 2 */}
-            <div className="bg-white p-6 rounded-2xl border-l-4 border-brand shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold text-brand bg-emerald-50 px-2 py-0.5 rounded-full uppercase">
-                  GEAAH · Semestre 6
-                </span>
-                <h3 className="font-serif text-lg font-bold text-gray-900 mt-2.5 leading-snug">
-                  Dimensionnement Réseaux AEP
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  Support de travaux pratiques complet sur le calcul des pertes de charge singulières et linéaires en conduite hydraulique.
-                </p>
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${doc.badgeClass}`}>
+                      {doc.filiere}
+                    </span>
+                    <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                      {doc.dateAdded}
+                    </span>
+                  </div>
+                  <h3 className="font-serif text-lg font-bold text-gray-900 mt-2.5 leading-snug">
+                    {doc.title}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                    {doc.description}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => openDriveFolder(doc.driveKey)}
+                  className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline text-left cursor-pointer"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Ouvrir le dossier Drive</span>
+                </button>
               </div>
-              <button 
-                onClick={() => openDriveFolder('geaah-s6d')}
-                className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline text-left"
-              >
-                <Download className="h-4 w-4" />
-                <span>Ouvrir le dossier Drive</span>
-              </button>
-            </div>
-
-            {/* Addition 3 */}
-            <div className="bg-white p-6 rounded-2xl border-l-4 border-gee shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-              <div>
-                <span className="text-[10px] font-bold text-gee bg-red-50 px-2 py-0.5 rounded-full uppercase">
-                  GEE · Options S9
-                </span>
-                <h3 className="font-serif text-lg font-bold text-gray-900 mt-2.5 leading-snug">
-                  Systèmes Solaires Photovoltaïques
-                </h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                  Guide pratique d'installation, de couplage et de configuration des onduleurs industriels connectés au réseau.
-                </p>
-              </div>
-              <button 
-                onClick={() => openDriveFolder('gee-op1')}
-                className="mt-6 inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline text-left"
-              >
-                <Download className="h-4 w-4" />
-                <span>Ouvrir le dossier Drive</span>
-              </button>
-            </div>
-
+            ))}
           </div>
         </section>
 

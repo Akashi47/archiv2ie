@@ -9,19 +9,11 @@ import Bibliotheque from './components/Bibliotheque';
 import Rapports from './components/Rapports';
 import Contribuer from './components/Contribuer';
 import About from './components/About';
-import Admin from './components/Admin';
 import { AnimatePresence, motion } from 'motion/react';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [selectedFiliere, setSelectedFiliere] = useState<FiliereKey>('gee');
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('page') === 'admin' || params.get('admin') === 'true') {
-      setCurrentPage('admin');
-    }
-  }, []);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -49,8 +41,6 @@ export default function App() {
         return <Contribuer setCurrentPage={setCurrentPage} />;
       case 'about':
         return <About />;
-      case 'admin':
-        return <Admin setCurrentPage={setCurrentPage} />;
       default:
         return <Home setCurrentPage={setCurrentPage} setSelectedFiliere={setSelectedFiliere} />;
     }
