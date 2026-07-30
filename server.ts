@@ -495,6 +495,29 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+  // Serve SEO files with explicit XML and plain text content-type
+  app.get("/sitemap.xml", (req, res) => {
+    res.header("Content-Type", "application/xml; charset=utf-8");
+    const distPath = path.join(process.cwd(), "dist", "sitemap.xml");
+    const publicPath = path.join(process.cwd(), "public", "sitemap.xml");
+    if (fs.existsSync(distPath)) {
+      res.sendFile(distPath);
+    } else {
+      res.sendFile(publicPath);
+    }
+  });
+
+  app.get("/robots.txt", (req, res) => {
+    res.header("Content-Type", "text/plain; charset=utf-8");
+    const distPath = path.join(process.cwd(), "dist", "robots.txt");
+    const publicPath = path.join(process.cwd(), "public", "robots.txt");
+    if (fs.existsSync(distPath)) {
+      res.sendFile(distPath);
+    } else {
+      res.sendFile(publicPath);
+    }
+  });
+
   // Initialize config and sync from Firestore on startup (non-blocking)
   initConfigFromFirestore().catch((err) => {
     console.error("[Firebase Server] Non-blocking initConfigFromFirestore failed:", err);
