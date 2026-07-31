@@ -18,7 +18,7 @@ import { Page } from '../types';
 // Numéros et identifiants de contact par défaut pour la contribution
 const WHATSAPP_NUMBER = '2250564749915'; // Numéro officiel WhatsApp archiv2ie
 const WHATSAPP_COMMUNITY_URL = 'https://chat.whatsapp.com/archiv2ie'; // Lien Groupe / Chaîne officiel WhatsApp
-const TELEGRAM_USERNAME = 'archiv2ie'; // Bot/Compte officiel Telegram
+const TELEGRAM_USERNAME = '@eyuaelie'; // Bot/Compte officiel Telegram
 const TELEGRAM_CHANNEL_URL = 'https://t.me/archiv2ie'; // Canal / Groupe officiel Telegram
 
 interface ContribuerProps {
