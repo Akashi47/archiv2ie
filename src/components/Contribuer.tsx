@@ -18,8 +18,8 @@ import { Page } from '../types';
 // Numéros et identifiants de contact par défaut pour la contribution
 const WHATSAPP_NUMBER = '2250564749915'; // Numéro officiel WhatsApp archiv2ie
 const WHATSAPP_COMMUNITY_URL = 'https://chat.whatsapp.com/archiv2ie'; // Lien Groupe / Chaîne officiel WhatsApp
-const TELEGRAM_USERNAME = 'eyuaelie'; // Bot/Compte officiel Telegram
-const TELEGRAM_CHANNEL_URL = 'https://t.me/archiv2ie'; // Canal / Groupe officiel Telegram
+const TELEGRAM_USERNAME = 'eyuaelie'; // Compte Telegram officiel
+const TELEGRAM_CHANNEL_URL = 'https://t.me/eyuaelie'; // Contact / Groupe Telegram
 
 interface ContribuerProps {
   setCurrentPage?: (page: Page) => void;
@@ -389,24 +389,6 @@ export default function Contribuer({ setCurrentPage }: ContribuerProps) {
                 <span>Rejoindre le Groupe / Chaîne WhatsApp 👥</span>
                 <ExternalLink className="h-3.5 w-3.5 text-emerald-600 opacity-80" />
               </a>
-
-              <button
-                type="button"
-                onClick={() => handleCopyText('whatsapp')}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold rounded-xl text-xs border border-gray-200 transition-all cursor-pointer"
-              >
-                {copiedKey === 'whatsapp' ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-600" />
-                    <span className="text-emerald-700">Message copié !</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5 text-gray-500" />
-                    <span>Copier le texte du message</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
 
@@ -464,24 +446,6 @@ export default function Contribuer({ setCurrentPage }: ContribuerProps) {
                 <span>Rejoindre la Chaîne / Groupe Telegram 📢</span>
                 <ExternalLink className="h-3.5 w-3.5 text-sky-600 opacity-80" />
               </a>
-
-              <button
-                type="button"
-                onClick={() => handleCopyText('telegram')}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 font-semibold rounded-xl text-xs border border-gray-200 transition-all cursor-pointer"
-              >
-                {copiedKey === 'telegram' ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-sky-600" />
-                    <span className="text-sky-700">Message copié !</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5 text-gray-500" />
-                    <span>Copier le texte du message</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
 

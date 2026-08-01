@@ -1,0 +1,11 @@
+/* TEAM */
+  Concepteur & Développeur Lead: Eyua Elie YAO
+  Telegram: @eyuaelie (https://t.me/eyuaelie)
+  Email: eyuaelijah@gmail.com
+  Rôle: Conception UI/UX, Architecture Web React, Intégration Drive & Firestore
+
+/* SITE */
+  Nom du site: archiv2ie
+  URL Officielle: https://archiv2ie.com/
+  Institution: Institut International d'Ingénierie de l'Eau et de l'Environnement (2iE)
+  Technologies: React, TypeScript, Tailwind CSS, Vite, Node.js

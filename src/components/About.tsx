@@ -23,7 +23,7 @@ export default function About() {
         
         {/* Our Mission */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-          <h3 className="font-serif text-xl font-bold text-gray-900">🎯 Notre Mission</h3>
+          <h3 className="font-serif text-xl font-bold text-gray-900">🎯 Notre mission</h3>
           <p className="text-xs text-gray-500 leading-relaxed">
             Centraliser, pérenniser et démocratiser l'accès aux supports documentaires indispensables de l'étudiant. Que vous soyez en Tronc Commun ou en phase de spécialisation poussée (GEE, GC-BTP, GEAAH), archiv2ie vous fournit les armes nécessaires pour appréhender sereinement vos contrôles et projets de groupe.
           </p>
@@ -39,9 +39,9 @@ export default function About() {
 
         {/* Contact & Support */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-          <h3 className="font-serif text-xl font-bold text-gray-900">📞 Contact & support</h3>
+          <h3 className="font-serif text-xl font-bold text-gray-900">💻 Conception et développement</h3>
           <p className="text-xs text-gray-500 leading-relaxed">
-            Une remarque ? Un lien mort ? Un dossier Drive qui nécessite une restructuration ? Contactez votre délégué pour soumettre vos suggestions d'améliorations techniques et documentaires.
+            Projet conçu et développé par <strong className="text-gray-800">Eyua Elie YAO</strong> (<a href="https://t.me/eyuaelie" target="_blank" rel="noopener noreferrer" className="text-brand font-bold hover:underline">@eyuaelie</a>). Pour toute remarque technique, suggestion d'amélioration ou partenariat, vous pouvez le contacter directement via Telegram ou par courriel à <a href="mailto:eyuaelijah@gmail.com" className="text-brand font-semibold hover:underline">eyuaelijah@gmail.com</a>.
           </p>
         </div>
 

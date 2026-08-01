@@ -36,7 +36,7 @@ export default function Footer({ setCurrentPage }: FooterProps) {
               </span>
             </div>
             <p className="text-xs text-gray-400 leading-relaxed max-w-sm">
-              Plateforme collaborative d'archivage numérique conçue par et pour les étudiants de l'Institut 2iE. Accédez librement aux cours, TD, examens, ainsi qu'aux rapports de stage d'excellence.
+              Plateforme collaborative d'archivage numérique conçue par et pour les étudiants de l'Institut 2iE. Accédez librement aux cours, TD, examens, ainsi qu'aux rapports de stage et PFE.
             </p>
 
           </div>
@@ -132,13 +132,15 @@ export default function Footer({ setCurrentPage }: FooterProps) {
       {/* Lower Copyright section */}
       <div className="bg-gray-950 py-6 border-t border-gray-800/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-gray-500">
-          <div>
-            <span>archiv2ie © 2026 · Tous droits réservés. Développé pour la communauté estudiantine de 2iE.</span>
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-center sm:text-left">
+            <span>archiv2ie © 2026 · Tous droits réservés.</span>
+            <span className="hidden sm:inline text-gray-700">|</span>
+            <span>Conçu et développé par <a href="https://t.me/eyuaelie" target="_blank" rel="noopener noreferrer" className="text-brand font-semibold hover:underline">Eyua Elie YAO (@eyuaelie)</a></span>
           </div>
-          <div className="flex gap-4">
-            <a href="https://akashi47.github.io/archiv2ie/" className="hover:underline">Site Original</a>
+          <div className="flex items-center gap-3">
+            <a href="https://akashi47.github.io/archiv2ie/" target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-gray-400">Site Original</a>
             <span>·</span>
-            <span>Version Interactive React</span>
+            <span>Version React</span>
           </div>
         </div>
       </div>
