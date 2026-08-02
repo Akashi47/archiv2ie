@@ -159,7 +159,7 @@ export default function Home({ setCurrentPage, setSelectedFiliere }: HomeProps) 
               <div className="space-y-4">
                 <h3 className="font-serif text-lg font-bold text-gray-900">🗂️ Stages & PFE</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">
-                  Exemples de rapports de stage de licence et de projets de fin d'études (PFE) d'excellence validés, ainsi que des canevas Word/LaTeX.
+                  Exemples de rapports de stage de licence et de projets de fin d'études (PFE).
                 </p>
               </div>
               <button 
