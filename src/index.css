@@ -1,33 +1,107 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=DM+Serif+Display&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Didact+Gothic&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Questrial&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+/* Clean ampersand without cursive/fancy flourishes across all fonts */
+@font-face {
+  font-family: 'CleanAmpersand';
+  src: local('Century Gothic'), local('Questrial'), local('Plus Jakarta Sans'), local('sans-serif');
+  unicode-range: U+0026; /* & */
+}
+
 @theme {
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "DM Serif Display", Georgia, serif;
+  --font-sans: "CleanAmpersand", "Century Gothic", CenturyGothic, "Apple Gothic", "Questrial", "Didact Gothic", "Plus Jakarta Sans", sans-serif;
+  --font-serif: "CleanAmpersand", "Century Gothic", CenturyGothic, "Apple Gothic", "Questrial", "Didact Gothic", "Plus Jakarta Sans", sans-serif;
   
-  --color-brand: #1D9E75;
-  --color-brand-hover: #167D5C;
-  --color-gee: #C0392B;
-  --color-gc: #D4A017;
-  --color-geaah: #1A5E9C;
+  --color-brand: #1b835e;
+  --color-brand-hover: #146447;
+  --color-brand-light: #eaf5ee;
+  --color-brand-soft: #f2f9f5;
+  
+  --color-warm-bg: #F8FAFC;
+  --color-warm-surface: #FFFFFF;
+  --color-warm-card: #FFFFFF;
+  --color-warm-border: #E2E8F0;
+  --color-warm-stone: #64748B;
+  --color-warm-dark: #0F172A;
+  
+  --color-gee: #B93826;
+  --color-gc: #C2820C;
+  --color-geaah: #1B588C;
 }
 
-/* Custom animations and styling utilities */
-.glass-effect {
-  background: rgba(255, 255, 255, 0.85);
+/* Base Body Styling with Century Gothic */
+body {
+  font-family: "CleanAmpersand", "Century Gothic", CenturyGothic, "Apple Gothic", "Questrial", "Didact Gothic", "Plus Jakarta Sans", sans-serif;
+  background-color: #F8FAFC;
+  color: #1E293B;
+  font-feature-settings: "lnum" 1, "cv02", "cv03", "cv04", "cv11";
+  font-variant-numeric: lining-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure headings and all numbers align properly on the baseline */
+.font-serif, h1, h2, h3, h4, h5, h6, span, p {
+  font-variant-numeric: lining-nums;
+  font-feature-settings: "lnum" 1;
+}
+
+h1, h2, h3, h4, h5, h6, .font-serif {
+  font-family: "CleanAmpersand", "Century Gothic", CenturyGothic, "Apple Gothic", "Questrial", "Didact Gothic", "Plus Jakarta Sans", sans-serif;
+  letter-spacing: -0.015em;
+}
+
+/* Modern Clean Slate Canvas matching the image */
+.human-canvas {
+  background-color: #F8FAFC;
+  background-image: 
+    radial-gradient(at 10% 10%, rgba(2, 132, 199, 0.025) 0px, transparent 40%),
+    radial-gradient(at 90% 90%, rgba(27, 131, 94, 0.025) 0px, transparent 40%);
+}
+
+/* Modern Clean Card */
+.human-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.human-card:hover {
+  border-color: #CBD5E1;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+}
+
+/* Note Banner */
+.human-note {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-left: 4px solid #1B835E;
+}
+
+/* Glass Header */
+.glass-warm {
+  background: rgba(248, 250, 252, 0.95);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
 }
 
-.card-shadow {
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 8px -1px rgba(0, 0, 0, 0.03);
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.card-hover-effect {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
 }
 
-.card-hover-effect:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }

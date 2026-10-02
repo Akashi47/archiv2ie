@@ -9,11 +9,46 @@ import Bibliotheque from './components/Bibliotheque';
 import Rapports from './components/Rapports';
 import Contribuer from './components/Contribuer';
 import About from './components/About';
+import UniversalSearchModal from './components/UniversalSearchModal';
 import { AnimatePresence, motion } from 'motion/react';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [selectedFiliere, setSelectedFiliere] = useState<FiliereKey>('gee');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Ensure single light mode and clear any legacy preferences
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('dark');
+    try {
+      localStorage.removeItem('archiv2ie_theme');
+      localStorage.removeItem('archiv2ie_local_favorites');
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Global keyboard shortcuts (Ctrl+K, Cmd+K, /)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setIsSearchOpen(prev => !prev);
+        return;
+      }
+
+      // Quick slash / shortcut when not in input or textarea
+      if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -21,7 +56,7 @@ export default function App() {
         return (
           <Home 
             setCurrentPage={setCurrentPage} 
-            setSelectedFiliere={setSelectedFiliere} 
+            setSelectedFiliere={setSelectedFiliere}
           />
         );
       case 'tronc-commun':
@@ -30,7 +65,7 @@ export default function App() {
         return (
           <Filieres 
             selectedFiliere={selectedFiliere} 
-            setSelectedFiliere={setSelectedFiliere} 
+            setSelectedFiliere={setSelectedFiliere}
           />
         );
       case 'bibliotheque':
@@ -38,21 +73,27 @@ export default function App() {
       case 'rapports':
         return <Rapports />;
       case 'contribuer':
-        return <Contribuer setCurrentPage={setCurrentPage} />;
+        return <Contribuer />;
       case 'about':
         return <About />;
       default:
-        return <Home setCurrentPage={setCurrentPage} setSelectedFiliere={setSelectedFiliere} />;
+        return (
+          <Home 
+            setCurrentPage={setCurrentPage} 
+            setSelectedFiliere={setSelectedFiliere}
+          />
+        );
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/20 font-sans flex flex-col justify-between" id="app-container">
+    <div className="min-h-screen human-canvas text-[#1E293B] font-sans flex flex-col justify-between" id="app-container">
       <div>
         <Header 
           currentPage={currentPage} 
           setCurrentPage={setCurrentPage} 
-          onSelectFiliere={setSelectedFiliere} 
+          onSelectFiliere={setSelectedFiliere}
+          onOpenSearch={() => setIsSearchOpen(true)}
         />
         
         <main className="min-h-[calc(100vh-16rem)]">
@@ -71,6 +112,14 @@ export default function App() {
       </div>
 
       <Footer setCurrentPage={setCurrentPage} />
+
+      {/* Universal Search Modal */}
+      <UniversalSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        setCurrentPage={setCurrentPage}
+        onSelectFiliere={setSelectedFiliere}
+      />
     </div>
   );
 }

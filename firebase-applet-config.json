@@ -6,5 +6,7 @@
   "firestoreDatabaseId": "ai-studio-remixarchiv2ie-f3ad1490-12d4-4648-b5e2-19e62c0a0027",
   "storageBucket": "inner-insight-p4dh4.firebasestorage.app",
   "messagingSenderId": "175651749029",
-  "measurementId": ""
+  "measurementId": "",
+  "oAuthClientId": "175651749029-3h4mrboq11jcrbq17g4et4ib2flffdiq.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }

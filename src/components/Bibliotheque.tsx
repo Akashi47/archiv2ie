@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import { libraryCategories, driveLinks } from '../data';
-import { CourseCategory } from '../types';
-import { Calculator, Droplet, HardHat, Zap, Leaf, Map, TrendingUp, Wrench, ExternalLink, Search, Library, AlertCircle, Copy, Check } from 'lucide-react';
+import { Calculator, Droplet, HardHat, Zap, Leaf, Map, TrendingUp, Wrench, ExternalLink, Library, Copy, Check, BookMarked, Sparkles } from 'lucide-react';
 
 export default function Bibliotheque() {
-  const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
 
   const openDriveFolder = (key: string) => {
-    const link = driveLinks[key];
+    const link = driveLinks[key] || driveLinks.default;
     if (link) {
       window.open(link, '_blank', 'noopener,noreferrer');
     } else {
@@ -16,102 +14,62 @@ export default function Bibliotheque() {
     }
   };
 
-  const getCategoryIcon = (iconName: string) => {
-    const props = { className: "h-6 w-6 text-brand" };
-    switch(iconName) {
-      case "Calculator": return <Calculator {...props} />;
-      case "Droplet": return <Droplet {...props} />;
-      case "HardHat": return <HardHat {...props} />;
-      case "Zap": return <Zap {...props} />;
-      case "Leaf": return <Leaf {...props} />;
-      case "Map": return <Map {...props} />;
-      case "TrendingUp": return <TrendingUp {...props} />;
-      case "Wrench": return <Wrench {...props} />;
-      default: return <Library {...props} />;
-    }
-  };
-
-  const filteredCategories = libraryCategories.filter(cat => 
-    cat.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    cat.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12 space-y-10">
       
       {/* Page Title */}
       <div className="space-y-4">
-        <h1 className="font-serif text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight">
+        <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-[#0F172A] tracking-tight">
           Bibliothèque Numérique
         </h1>
 
-        <div className="bg-gradient-to-r from-brand/5 via-brand/5 to-transparent border-l-4 border-brand p-6 rounded-r-2xl space-y-2">
-          <p className="font-sans text-gray-600 text-base sm:text-lg italic leading-relaxed">
-            "Un ingénieur qui ne lit pas est un ingénieur qui stagne."
+        <div className="human-note p-6 sm:p-8 rounded-2xl sm:rounded-3xl space-y-2">
+          <p className="font-sans text-[#334155] text-base sm:text-lg italic leading-relaxed">
+            "Un ingénieur qui ne lit pas est un ingénieur qui stagne. Explorez les manuels, Eurocodes, mémentos et recueils techniques indispensables."
           </p>
         </div>
-      </div>
-
-      {/* Quick Search */}
-      <div className="relative max-w-xl">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Rechercher une étagère ou une catégorie..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all shadow-sm"
-        />
       </div>
 
       {/* Grid Categories */}
-      {filteredCategories.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 card-shadow flex flex-col items-center justify-center space-y-3">
-          <AlertCircle className="h-10 w-10 text-gray-300" />
-          <h3 className="text-base font-bold text-gray-700">Aucun résultat</h3>
-          <p className="text-xs text-gray-400 max-w-sm leading-relaxed">
-            Nous n'avons pas trouvé d'étagère correspondant à votre recherche. Essayez un autre terme de recherche.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredCategories.map((cat) => (
-            <div 
-              key={cat.id} 
-              className="glass-effect p-6 rounded-2xl card-shadow card-hover-effect flex flex-col justify-between border border-gray-100 bg-white"
-            >
-              <div className="space-y-4">
-                <h3 className="font-serif text-lg font-bold text-gray-900 leading-tight">
-                  {cat.title}
-                </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {libraryCategories.map((cat) => (
+          <div 
+            key={cat.id} 
+            className="human-card p-6 rounded-2xl flex flex-col justify-between group"
+          >
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif text-lg font-bold text-[#0F172A] leading-tight">
+                    {cat.title}
+                  </h3>
+                </div>
                 
-                <p className="text-xs text-gray-500 leading-relaxed">
+                <p className="text-xs text-[#64748B] leading-relaxed">
                   {cat.description}
                 </p>
               </div>
 
               <button
                 onClick={() => openDriveFolder(cat.driveKey)}
-                className="mt-6 w-full text-center py-2.5 rounded-xl text-xs font-bold bg-gray-50 hover:bg-brand hover:text-white border border-gray-100 hover:border-brand transition-all text-gray-600 block"
+                className="mt-6 w-full text-center py-2.5 rounded-xl text-xs font-bold bg-[#F8FAFC] hover:bg-brand hover:text-white border border-[#E2E8F0] hover:border-brand transition-all text-[#334155] block cursor-pointer"
               >
                 Ouvrir le dossier Drive 📁
               </button>
             </div>
           ))}
         </div>
-      )}
 
       {/* OPAC CDI Physical Catalog Section */}
-      <div className="max-w-4xl mx-auto mt-16 p-8 bg-gray-50 border border-gray-100 rounded-3xl text-center space-y-6 shadow-sm">
-        <div className="p-3 bg-brand/10 text-brand rounded-full w-fit mx-auto font-bold text-2xl">
-          📚
+      <div className="max-w-4xl mx-auto mt-16 p-8 sm:p-10 bg-white border border-[#E2E8F0] rounded-3xl text-center space-y-6 shadow-[0_4px_24px_rgba(40,30,20,0.03)]">
+        <div className="p-3 bg-[#EAF5EE] text-[#1B835E] rounded-2xl w-fit mx-auto font-bold text-2xl border border-[#1B835E]/20">
+          🏛️
         </div>
         
         <div className="space-y-2">
-          <h3 className="font-serif text-xl sm:text-2xl font-bold text-gray-900">
-            Recherche avancée au catalogue physique (CDI)
+          <h3 className="font-serif text-xl sm:text-2xl font-bold text-[#0F172A]">
+            Recherche avancée au catalogue physique (CDI 2iE)
           </h3>
-          <p className="text-gray-500 text-xs max-w-2xl mx-auto leading-relaxed">
+          <p className="text-[#64748B] text-xs sm:text-sm max-w-2xl mx-auto leading-relaxed">
             Vous cherchez un ouvrage, un manuel de cours ou une thèse d'ingénieur disponible physiquement au Centre de Documentation et d'Information (CDI) sur le campus de l'Institut 2iE ?
           </p>
         </div>
@@ -121,7 +79,7 @@ export default function Bibliotheque() {
             href="http://documentation.2ie-edu.org/cdi2ie/opac_css/index.php" 
             target="_blank" 
             rel="noopener noreferrer" 
-            className="inline-flex items-center gap-2 px-6 py-3 bg-brand hover:bg-brand-hover text-white font-bold rounded-xl text-xs sm:text-sm shadow-md transition-all transform hover:-translate-y-0.5"
+            className="inline-flex items-center gap-2 px-6 py-3.5 bg-brand hover:bg-brand-hover text-white font-bold rounded-2xl text-xs sm:text-sm shadow-sm transition-all transform hover:-translate-y-0.5 cursor-pointer"
           >
             <span>Consulter le catalogue en ligne (OPAC)</span>
             <ExternalLink className="h-4 w-4" />
@@ -133,7 +91,7 @@ export default function Bibliotheque() {
               setCopied(true);
               setTimeout(() => setCopied(false), 2500);
             }}
-            className="inline-flex items-center gap-2 px-5 py-3 bg-white hover:bg-gray-100 text-gray-700 font-bold rounded-xl text-xs sm:text-sm border border-gray-200 transition-all shadow-sm cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-3.5 bg-[#F8FAFC] hover:bg-[#F4ECE1] text-[#334155] font-bold rounded-2xl text-xs sm:text-sm border border-[#E2E8F0] transition-all shadow-sm cursor-pointer"
             title="Copier le lien direct vers le catalogue en ligne de 2iE"
           >
             {copied ? (
@@ -144,14 +102,14 @@ export default function Bibliotheque() {
             ) : (
               <>
                 <span>Copier le lien direct</span>
-                <Copy className="h-4 w-4 text-gray-500" />
+                <Copy className="h-4 w-4 text-[#94A3B8]" />
               </>
             )}
           </button>
         </div>
         
-        <p className="text-[10px] text-gray-400 max-w-md mx-auto">
-          Note : Le catalogue officiel de 2iE utilise une adresse non-sécurisée (HTTP). Si le lien ne s'ouvre pas, copiez-le ci-dessus et collez-le directement dans un nouvel onglet de votre navigateur.
+        <p className="text-[11px] text-[#94A3B8] max-w-md mx-auto">
+          Note : Le catalogue officiel de 2iE utilise une adresse HTTP standard. Si le lien ne s'ouvre pas automatiquement, copiez-le ci-dessus et ouvrez-le directement dans votre navigateur.
         </p>
       </div>
 

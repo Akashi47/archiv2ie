@@ -1,5 +1,21 @@
 export type Page = 'home' | 'tronc-commun' | 'filieres' | 'bibliotheque' | 'rapports' | 'contribuer' | 'about';
 
+export type DocTypeFilter = 'all' | 'cours' | 'examens' | 'td-tp' | 'rapports' | 'bibliotheque' | 'specialites';
+
+export interface SearchableItem {
+  id: string;
+  title: string;
+  category: 'cours' | 'examens' | 'td-tp' | 'rapports' | 'bibliotheque' | 'specialites';
+  categoryLabel: string;
+  filiereOrLevel: string;
+  description: string;
+  keywords: string[];
+  driveKey: string;
+  pageTarget?: Page;
+  filiereTarget?: FiliereKey;
+  badgeClass?: string;
+}
+
 export interface Subject {
   name: string;
   type: string;
@@ -67,3 +83,36 @@ export interface RecentDocument {
   badgeClass: string;
   borderClass: string;
 }
+
+export interface FavoriteItem {
+  id: string;
+  title: string;
+  category: string;
+  filiereOrLevel?: string;
+  driveKey: string;
+  addedAt: string;
+}
+
+export interface HistoryItem {
+  id: string;
+  title: string;
+  category?: string;
+  filiereOrLevel?: string;
+  driveKey: string;
+  viewedAt: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  filiere?: FiliereKey | 'tronc-commun' | '';
+  semestre?: string;
+  promotion?: string;
+  favorites: FavoriteItem[];
+  recentHistory: HistoryItem[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+

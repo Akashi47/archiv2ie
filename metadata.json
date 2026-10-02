@@ -1,6 +1,6 @@
 {
   "name": "Remix: Archiv2iE",
-  "description": "Plateforme d\u0027archivage et de partage de ressources pédagogiques pour les étudiants de l\u0027Institut 2iE.",
+  "description": "Plateforme collaborative d'archivage numérique conçue par et pour les étudiants de l'Institut 2iE. Accédez librement aux cours, TD, examens, ainsi qu'aux rapports de stage et PFE.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

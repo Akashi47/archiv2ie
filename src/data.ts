@@ -194,10 +194,10 @@ export const filieresData: FiliereData[] = [
     badgeClass: "bg-red-100 text-red-800",
     quote: "Dans un monde qui brûle ses dernières réserves fossiles, l'ingénieur GEE est celui qui allume une autre lumière.",
     semesters: [
-      { key: "S5D", title: "Semestre 5 — Parcours D", description: "Bases de l'électrotechnique, circuits électriques et intégration post-BTS.", driveKey: "gee-s5d" },
-      { key: "S5S", title: "Semestre 5 — Parcours S", description: "Électromagnétisme fondamental, thermodynamique appliquée et physique de l'ingénieur.", driveKey: "gee-s5s" },
-      { key: "S6D", title: "Semestre 6 — Parcours D", description: "Harmonisation des notions de machines électriques tournantes et automatique.", driveKey: "gee-s6d" },
-      { key: "S6S", title: "Semestre 6 — Parcours S", description: "Traitement de signal, commande analogique et électronique de puissance.", driveKey: "gee-s6s" },
+      { key: "S5D", title: "Semestre 5 - Parcours D", description: "Bases de l'électrotechnique, circuits électriques et intégration post-BTS.", driveKey: "gee-s5d" },
+      { key: "S5S", title: "Semestre 5 - Parcours S", description: "Électromagnétisme fondamental, thermodynamique appliquée et physique de l'ingénieur.", driveKey: "gee-s5s" },
+      { key: "S6D", title: "Semestre 6 - Parcours D", description: "Harmonisation des notions de machines électriques tournantes et automatique.", driveKey: "gee-s6d" },
+      { key: "S6S", title: "Semestre 6 - Parcours S", description: "Traitement de signal, commande analogique et électronique de puissance.", driveKey: "gee-s6s" },
       { key: "S7", title: "Semestre 7", description: "Turbomachines, conversion d'énergie, réseaux électriques équilibrés et déséquilibrés.", driveKey: "gee-s7" },
       { key: "S8", title: "Semestre 8", description: "Économie énergétique de marché, régulation numérique et commande avancée des machines.", driveKey: "gee-s8" }
     ],
@@ -219,7 +219,7 @@ export const filieresData: FiliereData[] = [
   {
     key: "gc-btp",
     name: "GC-BTP",
-    fullName: "Génie Civil — Bâtiment et Travaux Publics",
+    fullName: "Génie Civil - Bâtiment et Travaux Publics",
     colorClass: "bg-gc text-white hover:bg-amber-700",
     textClass: "text-gc",
     bgClass: "bg-amber-50",
@@ -227,10 +227,10 @@ export const filieresData: FiliereData[] = [
     badgeClass: "bg-amber-100 text-amber-800",
     quote: "Avant qu'une route existe, elle a d'abord existé dans la tête d'un ingénieur GC.",
     semesters: [
-      { key: "S5D", title: "Semestre 5 — Parcours D", description: "Bases du calcul structural, RDM appliquée et initiation Eurocodes/BAEL.", driveKey: "gc-s5d" },
-      { key: "S5S", title: "Semestre 5 — Parcours S", description: "Mécanique des milieux continus (MMC), mathématiques de l'ingénieur et structures.", driveKey: "gc-s5s" },
-      { key: "S6D", title: "Semestre 6 — Parcours D", description: "Topographie d'exécution, calcul d'ouvrages routiers et terrassements.", driveKey: "gc-s6d" },
-      { key: "S6S", title: "Semestre 6 — Parcours S", description: "Résistance des matériaux avancée (RDM 2), méthodes énergétiques de calcul.", driveKey: "gc-s6s" },
+      { key: "S5D", title: "Semestre 5 - Parcours D", description: "Bases du calcul structural, RDM appliquée et initiation Eurocodes/BAEL.", driveKey: "gc-s5d" },
+      { key: "S5S", title: "Semestre 5 - Parcours S", description: "Mécanique des milieux continus (MMC), mathématiques de l'ingénieur et structures.", driveKey: "gc-s5s" },
+      { key: "S6D", title: "Semestre 6 - Parcours D", description: "Topographie d'exécution, calcul d'ouvrages routiers et terrassements.", driveKey: "gc-s6d" },
+      { key: "S6S", title: "Semestre 6 - Parcours S", description: "Résistance des matériaux avancée (RDM 2), méthodes énergétiques de calcul.", driveKey: "gc-s6s" },
       { key: "S7", title: "Semestre 7", description: "Dimensionnement Béton Armé complet, note de calcul de fondations et ouvrages de soutènement.", driveKey: "gc-s7" },
       { key: "S8", title: "Semestre 8", description: "Charpente métallique avancée, modélisation RDM sur logiciel, dynamique des structures.", driveKey: "gc-s8" }
     ],
@@ -260,10 +260,10 @@ export const filieresData: FiliereData[] = [
     badgeClass: "bg-blue-100 text-blue-800",
     quote: "L'eau est rare. Les ingénieurs qui savent la trouver, la traiter et la distribuer le sont encore plus.",
     semesters: [
-      { key: "S5D", title: "Semestre 5 — Parcours D", description: "Bases de l'hydrologie générale, chimie de l'eau et microbiologie sanitaire.", driveKey: "geaah-s5d" },
-      { key: "S5S", title: "Semestre 5 — Parcours S", description: "Mécanique des fluides incompressibles complexes, mathématiques de l'ingénieur.", driveKey: "geaah-s5s" },
-      { key: "S6D", title: "Semestre 6 — Parcours D", description: "Dimensionnement d'ouvrages de captage et d'art hydraulique élémentaire.", driveKey: "geaah-s6d" },
-      { key: "S6S", title: "Semestre 6 — Parcours S", description: "Hydrologie statistique fréquentielle et modélisation des écoulements de bassin.", driveKey: "geaah-s6s" },
+      { key: "S5D", title: "Semestre 5 - Parcours D", description: "Bases de l'hydrologie générale, chimie de l'eau et microbiologie sanitaire.", driveKey: "geaah-s5d" },
+      { key: "S5S", title: "Semestre 5 - Parcours S", description: "Mécanique des fluides incompressibles complexes, mathématiques de l'ingénieur.", driveKey: "geaah-s5s" },
+      { key: "S6D", title: "Semestre 6 - Parcours D", description: "Dimensionnement d'ouvrages de captage et d'art hydraulique élémentaire.", driveKey: "geaah-s6d" },
+      { key: "S6S", title: "Semestre 6 - Parcours S", description: "Hydrologie statistique fréquentielle et modélisation des écoulements de bassin.", driveKey: "geaah-s6s" },
       { key: "S7", title: "Semestre 7", description: "Calcul hydraulique des réseaux d'Adduction en Eau Potable (AEP), épuration biologique des eaux usées.", driveKey: "geaah-s7" },
       { key: "S8", title: "Semestre 8", description: "Hydraulique fluviale, Planification intégrée des ressources en eau (GIRE) et SIG appliqués.", driveKey: "geaah-s8" }
     ],
