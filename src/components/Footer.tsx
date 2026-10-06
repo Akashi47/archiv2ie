@@ -132,15 +132,8 @@ export default function Footer({ setCurrentPage }: FooterProps) {
 
       {/* Lower Copyright section */}
       <div className="bg-[#0A1827] py-6 border-t border-[#18314A]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-[#7B99B5]">
-          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-center sm:text-left">
-            <span>archiv2ie © 2026 · Tous droits réservés.</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <a href="https://akashi47.github.io/archiv2ie/" target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-white">Site Original</a>
-            <span>·</span>
-            <span className="text-[#38BDF8] font-medium">archiv2ie React</span>
-          </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-[#7B99B5]">
+          <span>archiv2ie © 2026 · Tous droits réservés.</span>
         </div>
       </div>
 

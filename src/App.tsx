@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Page, FiliereKey } from './types';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -12,10 +12,95 @@ import About from './components/About';
 import UniversalSearchModal from './components/UniversalSearchModal';
 import { AnimatePresence, motion } from 'motion/react';
 
+function parseHash(hash: string): { page: Page; filiere?: FiliereKey } {
+  const clean = hash ? hash.replace(/^#\/?/, '').trim() : '';
+  if (!clean || clean === 'home') {
+    return { page: 'home' };
+  }
+
+  const [routePart, queryPart] = clean.split('?');
+  const validPages: Page[] = ['home', 'tronc-commun', 'filieres', 'bibliotheque', 'rapports', 'contribuer', 'about'];
+
+  let matchedPage: Page = 'home';
+  if (validPages.includes(routePart as Page)) {
+    matchedPage = routePart as Page;
+  }
+
+  let matchedFiliere: FiliereKey | undefined = undefined;
+  if (queryPart) {
+    const params = new URLSearchParams(queryPart);
+    const f = params.get('filiere');
+    if (f === 'gee' || f === 'gc-btp' || f === 'geaah') {
+      matchedFiliere = f;
+    }
+  }
+
+  return { page: matchedPage, filiere: matchedFiliere };
+}
+
+function buildHash(page: Page, filiere?: FiliereKey): string {
+  if (page === 'home') return '#home';
+  if (page === 'filieres' && filiere) {
+    return `#filieres?filiere=${filiere}`;
+  }
+  return `#${page}`;
+}
+
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('home');
-  const [selectedFiliere, setSelectedFiliere] = useState<FiliereKey>('gee');
+  const initial = parseHash(typeof window !== 'undefined' ? window.location.hash : '');
+  const [currentPage, setCurrentPage] = useState<Page>(initial.page);
+  const [selectedFiliere, setSelectedFiliere] = useState<FiliereKey>(initial.filiere || 'gee');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Centralized navigation with browser history pushState
+  const navigateTo = useCallback((page: Page, filiere?: FiliereKey, replace: boolean = false) => {
+    setCurrentPage(page);
+    if (filiere) {
+      setSelectedFiliere(filiere);
+    }
+    const targetFiliere = filiere || (page === 'filieres' ? selectedFiliere : undefined);
+    const targetHash = buildHash(page, targetFiliere);
+
+    if (window.location.hash !== targetHash) {
+      if (replace) {
+        window.history.replaceState({ page, filiere: targetFiliere }, '', targetHash);
+      } else {
+        window.history.pushState({ page, filiere: targetFiliere }, '', targetHash);
+      }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [selectedFiliere]);
+
+  // Handle browser Back / Forward buttons (popstate & hashchange)
+  useEffect(() => {
+    if (!window.location.hash) {
+      window.history.replaceState({ page: 'home' }, '', '#home');
+    } else if (!window.history.state) {
+      const init = parseHash(window.location.hash);
+      window.history.replaceState(
+        { page: init.page, filiere: init.filiere || 'gee' },
+        '',
+        buildHash(init.page, init.filiere || 'gee')
+      );
+    }
+
+    const handleLocationChange = () => {
+      const parsed = parseHash(window.location.hash);
+      setCurrentPage(parsed.page);
+      if (parsed.filiere) {
+        setSelectedFiliere(parsed.filiere);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, []);
 
   // Ensure single light mode and clear any legacy preferences
   useEffect(() => {
@@ -55,8 +140,8 @@ export default function App() {
       case 'home':
         return (
           <Home 
-            setCurrentPage={setCurrentPage} 
-            setSelectedFiliere={setSelectedFiliere}
+            setCurrentPage={(p) => navigateTo(p)} 
+            setSelectedFiliere={(f) => navigateTo('filieres', f)}
           />
         );
       case 'tronc-commun':
@@ -65,7 +150,7 @@ export default function App() {
         return (
           <Filieres 
             selectedFiliere={selectedFiliere} 
-            setSelectedFiliere={setSelectedFiliere}
+            setSelectedFiliere={(f) => navigateTo('filieres', f)}
           />
         );
       case 'bibliotheque':
@@ -79,8 +164,8 @@ export default function App() {
       default:
         return (
           <Home 
-            setCurrentPage={setCurrentPage} 
-            setSelectedFiliere={setSelectedFiliere}
+            setCurrentPage={(p) => navigateTo(p)} 
+            setSelectedFiliere={(f) => navigateTo('filieres', f)}
           />
         );
     }
@@ -91,15 +176,15 @@ export default function App() {
       <div>
         <Header 
           currentPage={currentPage} 
-          setCurrentPage={setCurrentPage} 
-          onSelectFiliere={setSelectedFiliere}
+          setCurrentPage={(p) => navigateTo(p)} 
+          onSelectFiliere={(f) => navigateTo('filieres', f)}
           onOpenSearch={() => setIsSearchOpen(true)}
         />
-        
+
         <main className="min-h-[calc(100vh-16rem)]">
           <AnimatePresence mode="wait">
             <motion.div
-              key={currentPage}
+              key={currentPage + (currentPage === 'filieres' ? `-${selectedFiliere}` : '')}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
@@ -111,14 +196,14 @@ export default function App() {
         </main>
       </div>
 
-      <Footer setCurrentPage={setCurrentPage} />
+      <Footer setCurrentPage={(p) => navigateTo(p)} />
 
       {/* Universal Search Modal */}
       <UniversalSearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
-        setCurrentPage={setCurrentPage}
-        onSelectFiliere={setSelectedFiliere}
+        setCurrentPage={(p) => navigateTo(p)}
+        onSelectFiliere={(f) => navigateTo('filieres', f)}
       />
     </div>
   );
